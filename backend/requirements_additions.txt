@@ -1,0 +1,15 @@
+# ============================================================
+# EdgeIQ Firestore Migration — Additional Dependencies
+# ============================================================
+# Add these lines to your existing backend/requirements.txt
+# Then run: pip install -r requirements.txt
+
+# Firebase Admin SDK (server-side Firestore access)
+firebase-admin>=6.4.0
+
+# Firestore native client (optional, but recommended for performance)
+google-cloud-firestore>=2.16.0
+
+# If you plan to use Firestore's async capabilities later:
+# grpcio>=1.62.0
+# grpcio-status>=1.62.0

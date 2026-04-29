@@ -3,7 +3,6 @@
 Django backend for EdgeIQ - prediction market trading signals with AI agents.
 
 ## Table of Contents
-
 - [Quick Start](#quick-start)
 - [API Endpoints](#api-endpoints)
 - [Testing Endpoints](#testing-endpoints)
@@ -67,39 +66,39 @@ Server will be available at: `http://127.0.0.1:8000/`
 
 ### Markets Endpoints
 
-| Method | Endpoint                     | Description                  |
-| ------ | ---------------------------- | ---------------------------- |
-| POST   | `/api/markets/scan/`         | Fetch markets from Bayse     |
-| POST   | `/api/markets/{id}/analyze/` | Run all 4 agents on a market |
-| GET    | `/api/markets/`              | List all markets             |
-| GET    | `/api/markets/{id}/`         | Get specific market details  |
-| DELETE | `/api/markets/{id}/`         | Delete a market              |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/markets/scan/` | Fetch markets from Bayse |
+| POST | `/api/markets/{id}/analyze/` | Run all 4 agents on a market |
+| GET | `/api/markets/` | List all markets |
+| GET | `/api/markets/{id}/` | Get specific market details |
+| DELETE | `/api/markets/{id}/` | Delete a market |
 
 ### Signals Endpoints
 
-| Method | Endpoint               | Description                 |
-| ------ | ---------------------- | --------------------------- |
-| GET    | `/api/signals/`        | List all signals            |
-| GET    | `/api/signals/active/` | Get active trading signals  |
-| GET    | `/api/signals/{id}/`   | Get specific signal details |
-| PATCH  | `/api/signals/{id}/`   | Update a signal             |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/signals/` | List all signals |
+| GET | `/api/signals/active/` | Get active trading signals |
+| GET | `/api/signals/{id}/` | Get specific signal details |
+| PATCH | `/api/signals/{id}/` | Update a signal |
 
 ### Portfolio Endpoints
 
-| Method | Endpoint                         | Description             |
-| ------ | -------------------------------- | ----------------------- |
-| GET    | `/api/portfolio/profile/`        | Get user profile        |
-| POST   | `/api/portfolio/simulate_trade/` | Record a trade          |
-| GET    | `/api/portfolio/analytics/`      | Get performance metrics |
-| GET    | `/api/portfolio/trades/`         | List all trades         |
-| GET    | `/api/portfolio/positions/`      | Get current positions   |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/portfolio/profile/` | Get user profile |
+| POST | `/api/portfolio/simulate_trade/` | Record a trade |
+| GET | `/api/portfolio/analytics/` | Get performance metrics |
+| GET | `/api/portfolio/trades/` | List all trades |
+| GET | `/api/portfolio/positions/` | Get current positions |
 
 ### Backtesting Endpoints
 
-| Method | Endpoint                    | Description              |
-| ------ | --------------------------- | ------------------------ |
-| POST   | `/api/backtesting/run/`     | Run backtest on strategy |
-| GET    | `/api/backtesting/results/` | Get backtest results     |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/backtesting/run/` | Run backtest on strategy |
+| GET | `/api/backtesting/results/` | Get backtest results |
 
 ---
 
@@ -115,7 +114,6 @@ curl -X POST http://127.0.0.1:8000/api/markets/scan/ \
 ```
 
 **Expected Response:**
-
 ```json
 {
   "status": "success",
@@ -134,7 +132,6 @@ curl -X GET http://127.0.0.1:8000/api/markets/ \
 ```
 
 **Expected Response:**
-
 ```json
 {
   "count": 25,
@@ -164,7 +161,6 @@ curl -X GET http://127.0.0.1:8000/api/markets/1/ \
 ```
 
 **Expected Response:**
-
 ```json
 {
   "id": 1,
@@ -190,7 +186,6 @@ curl -X POST http://127.0.0.1:8000/api/markets/1/analyze/ \
 ```
 
 **Expected Response:**
-
 ```json
 {
   "status": "success",
@@ -227,7 +222,6 @@ curl -X GET http://127.0.0.1:8000/api/signals/active/ \
 ```
 
 **Expected Response:**
-
 ```json
 {
   "count": 8,
@@ -260,13 +254,12 @@ curl -X GET http://127.0.0.1:8000/api/portfolio/profile/ \
 ```
 
 **Expected Response:**
-
 ```json
 {
   "user_id": 1,
   "username": "trader_001",
-  "portfolio_value": 10500.0,
-  "cash_balance": 5000.0,
+  "portfolio_value": 10500.00,
+  "cash_balance": 5000.00,
   "total_positions": 8,
   "total_return": 5.0,
   "risk_tolerance": "balanced",
@@ -290,19 +283,18 @@ curl -X POST http://127.0.0.1:8000/api/portfolio/simulate_trade/ \
 ```
 
 **Expected Response:**
-
 ```json
 {
   "status": "success",
   "trade_id": 42,
   "market_id": 1,
   "position_type": "BUY",
-  "amount": 500.0,
+  "amount": 500.00,
   "price": 0.65,
   "shares": 769.23,
   "timestamp": "2024-04-19T14:30:00Z",
-  "new_cash_balance": 4500.0,
-  "new_portfolio_value": 10500.0
+  "new_cash_balance": 4500.00,
+  "new_portfolio_value": 10500.00
 }
 ```
 
@@ -316,7 +308,6 @@ curl -X GET http://127.0.0.1:8000/api/portfolio/analytics/ \
 ```
 
 **Expected Response:**
-
 ```json
 {
   "total_trades": 25,
@@ -324,18 +315,18 @@ curl -X GET http://127.0.0.1:8000/api/portfolio/analytics/ \
   "losing_trades": 7,
   "win_rate": 0.72,
   "total_return": 5.0,
-  "total_pnl": 500.0,
+  "total_pnl": 500.00,
   "sharpe_ratio": 1.45,
   "max_drawdown": -0.08,
-  "average_trade_size": 450.0,
+  "average_trade_size": 450.00,
   "best_trade": {
     "market_title": "Will Bitcoin reach $100,000?",
-    "pnl": 150.0,
+    "pnl": 150.00,
     "return": 30.0
   },
   "worst_trade": {
     "market_title": "Will Ethereum flip Bitcoin?",
-    "pnl": -75.0,
+    "pnl": -75.00,
     "return": -15.0
   }
 }
@@ -351,7 +342,6 @@ curl -X GET http://127.0.0.1:8000/api/portfolio/trades/ \
 ```
 
 **Expected Response:**
-
 ```json
 {
   "count": 25,
@@ -363,7 +353,7 @@ curl -X GET http://127.0.0.1:8000/api/portfolio/trades/ \
       "position_type": "BUY",
       "entry_price": 0.65,
       "exit_price": null,
-      "amount": 500.0,
+      "amount": 500.00,
       "shares": 769.23,
       "pnl": null,
       "status": "open",
@@ -384,11 +374,10 @@ curl -X GET http://127.0.0.1:8000/api/portfolio/positions/ \
 ```
 
 **Expected Response:**
-
 ```json
 {
   "count": 8,
-  "total_value": 5500.0,
+  "total_value": 5500.00,
   "results": [
     {
       "market_id": 1,
@@ -398,7 +387,7 @@ curl -X GET http://127.0.0.1:8000/api/portfolio/positions/ \
       "entry_price": 0.65,
       "current_price": 0.68,
       "current_value": 523.08,
-      "cost_basis": 500.0,
+      "cost_basis": 500.00,
       "unrealized_pnl": 23.08,
       "unrealized_return": 4.62
     }
@@ -420,7 +409,7 @@ curl -X GET http://127.0.0.1:8000/api/portfolio/positions/ \
    - **Name**: Descriptive name (e.g., "Scan Markets")
    - **Method**: GET/POST as specified
    - **URL**: `{{base_url}}/api/markets/scan/`
-   - **Headers**:
+   - **Headers**: 
      - `Content-Type: application/json`
    - **Body** (for POST requests): Raw JSON
 
@@ -501,28 +490,27 @@ def test_get_analytics():
 
 if __name__ == "__main__":
     print("=== Testing EdgeIQ API Endpoints ===\n")
-
+    
     print("1. Scanning Markets...")
     test_scan_markets()
-
+    
     print("\n2. Getting All Markets...")
     test_get_markets()
-
+    
     print("\n3. Analyzing Market ID 1...")
     test_analyze_market(1)
-
+    
     print("\n4. Getting Active Signals...")
     test_get_active_signals()
-
+    
     print("\n5. Simulating Trade...")
     test_simulate_trade()
-
+    
     print("\n6. Getting Analytics...")
     test_get_analytics()
 ```
 
 Run the test script:
-
 ```bash
 python test_endpoints.py
 ```
@@ -580,14 +568,14 @@ backend/
 
 ### Environment Variables
 
-| Variable         | Description                             | Required            |
-| ---------------- | --------------------------------------- | ------------------- |
-| `BAYSE_API_KEY`  | API key for Bayse prediction markets    | Yes                 |
-| `GEMINI_API_KEY` | Google Gemini API key for AI analysis   | Yes                 |
-| `SECRET_KEY`     | Django secret key                       | Yes                 |
-| `DEBUG`          | Enable debug mode (True/False)          | No (default: False) |
-| `ALLOWED_HOSTS`  | Comma-separated list of allowed hosts   | No                  |
-| `DATABASE_URL`   | PostgreSQL connection string (optional) | No                  |
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `BAYSE_API_KEY` | API key for Bayse prediction markets | Yes |
+| `GEMINI_API_KEY` | Google Gemini API key for AI analysis | Yes |
+| `SECRET_KEY` | Django secret key | Yes |
+| `DEBUG` | Enable debug mode (True/False) | No (default: False) |
+| `ALLOWED_HOSTS` | Comma-separated list of allowed hosts | No |
+| `DATABASE_URL` | PostgreSQL connection string (optional) | No |
 
 ### Risk Tolerance Levels
 
@@ -804,13 +792,11 @@ CSRF_COOKIE_SECURE = True
 ### Common Issues
 
 **Issue**: `ModuleNotFoundError: No module named 'rest_framework'`
-
 ```bash
 pip install djangorestframework
 ```
 
 **Issue**: `ImproperlyConfigured: Set the BAYSE_API_KEY environment variable`
-
 ```bash
 # Make sure .env file is created and loaded
 cp .env.example .env
@@ -818,7 +804,6 @@ cp .env.example .env
 ```
 
 **Issue**: Database migration errors
-
 ```bash
 # Delete migrations and start fresh
 find . -path "*/migrations/*.py" -not -name "__init__.py" -delete
@@ -827,7 +812,6 @@ python manage.py migrate
 ```
 
 **Issue**: API returns 404
-
 ```bash
 # Verify the URL is correct
 # Check that the app is registered in INSTALLED_APPS
@@ -855,7 +839,6 @@ This project is licensed under the MIT License.
 ## Support
 
 For issues and questions:
-
 - Open an issue on GitHub
 - Contact: support@edgeiq.com
 

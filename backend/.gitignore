@@ -1,0 +1,42 @@
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# Python
+*.pyc
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Django
+*.log
+db.sqlite3
+db.sqlite3-journal
+/media
+/staticfiles
+
+# Environment variables
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Firebase credentials
+edgeiq-hackathon-firebase-adminsdk-fbsvc-9862e6274f.json
+
+*.json
+edgeiq-hackathon-firebase-adminsdk-*.json
