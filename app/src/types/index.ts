@@ -59,6 +59,7 @@ export interface Signal {
   market_id: string;
   market_title: string;
   market_event_id: string;
+  category?: string;
   direction: 'BUY' | 'SELL' | 'WAIT';
   edge_score: number;
   expected_value: number;

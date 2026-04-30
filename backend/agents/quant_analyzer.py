@@ -56,7 +56,7 @@ def analyze_market(market_id):
     try:
         # Get market from database
         Market = _get_market_model()
-        market = Market.objects.get(id=market_id)
+        market = Market.objects.get(bayse_event_id=market_id)
         logger.info(f"Analyzing market: {market.title}")
 
         # Fetch all required data from Bayse

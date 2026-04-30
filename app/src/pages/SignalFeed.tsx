@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSignalStore, useMarketStore } from "@/stores";
-import { getActiveSignals, getSignalStats } from "@/lib/api";
+import { getActiveSignals, getSignalStats, analyzeMarket } from "@/lib/api";
 import {
   Zap,
   TrendingUp,
@@ -109,7 +109,7 @@ const SignalCard = ({ signal, onClick }: { signal: Signal; onClick: () => void }
 const SignalFeed = () => {
   const navigate = useNavigate();
   const { activeSignals, loading, error, minEdgeFilter, categoryFilter, setActiveSignals, setLoading, setError, setMinEdgeFilter, setCategoryFilter } = useSignalStore();
-  const { setSelectedMarket } = useMarketStore();
+  const { setSelectedMarket, setQuantMetrics, setAiAnalysis } = useMarketStore();
   const [stats, setStats] = useState<{ total_active: number; by_direction: Record<string, number>; by_strength: Record<string, number>; edge_stats?: { avg_edge: number; max_edge: number; min_edge: number }; confidence_stats?: { avg_confidence: number; max_confidence: number; min_confidence: number } } | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "info" } | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
@@ -125,7 +125,7 @@ const SignalFeed = () => {
       if (signalsRes.success) {
         let signals = signalsRes.signals;
         if (categoryFilter) {
-          signals = signals.filter((s) => s.market_title.toLowerCase().includes(categoryFilter.toLowerCase()));
+          signals = signals.filter((s) => (s.category || "other").toLowerCase() === categoryFilter.toLowerCase());
         }
         setActiveSignals(signals);
         const highEdge = signals.find((s) => s.edge_score > 20);
@@ -150,8 +150,35 @@ const SignalFeed = () => {
   }, [fetchSignals]);
 
   const handleSignalClick = async (signal: Signal) => {
-    setSelectedMarket(null);
-    navigate(`/market/${signal.market_event_id || signal.market_id}`);
+    const marketId = signal.market_event_id || signal.market_id;
+    
+    // Pre-populate basic market data
+    setSelectedMarket({
+      title: signal.market_title,
+      bayse_event_id: marketId,
+      current_price: signal.market_probability / 100,
+      implied_probability: signal.market_probability,
+      category: signal.category || "other",
+    } as any);
+    setQuantMetrics({
+      momentum_score: signal.quant_snapshot?.momentum_score || 0,
+      momentum_direction: signal.quant_snapshot?.momentum_direction || "neutral",
+      volume_acceleration: signal.quant_snapshot?.volume_acceleration || 1,
+      order_book_bias: signal.quant_snapshot?.order_book_bias || "neutral",
+      bid_ask_spread: 0,
+    } as any);
+    
+    // Fetch full AI analysis with reasoning
+    try {
+      const result = await analyzeMarket(marketId, 10000);
+      if (result.success) {
+        setAiAnalysis(result.ai_analysis);
+        if (result.market) setSelectedMarket(result.market as any);
+      }
+    } catch {}
+    
+    sessionStorage.setItem("fromSignal", "true");
+    navigate(`/market/${marketId}`);
   };
 
   const categories = ["crypto", "sports", "politics", "entertainment", "other"];
@@ -241,7 +268,7 @@ const SignalFeed = () => {
           <span className="text-xs text-[#8b92a8]">Min Edge</span>
           <input
             type="range"
-            min="5"
+            min="0"
             max="30"
             step="5"
             value={minEdgeFilter}

@@ -63,37 +63,31 @@ class SignalViewSet(ViewSet):
             order_by=("edge_score", True),
             limit=50,
         )
-
-        # Category filter is on the market, not the signal.
-        # Firestore doesn't support joins; filter in Python.
-        category = request.query_params.get('category')
-        if category:
-            # Fetch markets in that category, then intersect
-            markets = fs.query(
-                Collection.MARKETS,
-                filters=[("category", "==", category)],
-            )
-            market_ids = {m["id"] for m in markets}
-            results = [r for r in results if r.get("market_id") in market_ids]
-
-        return Response({"success": True, "count": len(results), "signals": results})
-
-    # ---------- retrieve ----------
+    def active(self, request):
+        """GET /api/signals/active/"""
+        limit = int(request.query_params.get("limit", 20))
+        min_edge = float(request.query_params.get("min_edge", 0))
+        signals = get_active_signals(limit=limit, min_edge=min_edge)
+        
+        # Enrich signals with market category
+        for signal in signals:
+            market_id = signal.get("market_event_id") or signal.get("market_id")
+            if market_id:
+                market = fs.get(Collection.MARKETS, market_id)
+                if market:
+                    signal["category"] = market.get("category", "other")
+                else:
+                    signal["category"] = "other"
+            else:
+                signal["category"] = "other"
+        
+        return Response({"success": True, "count": len(signals), "signals": signals})
     def retrieve(self, request, pk=None):
         """GET /api/signals/{id}/"""
         signal = fs.get(Collection.SIGNALS, pk)
         if not signal:
             return Response({"success": False, "error": "Signal not found"}, status=404)
         return Response({"success": True, "signal": signal})
-
-    # ---------- active ----------
-    @action(detail=False, methods=['get'])
-    def active(self, request):
-        """GET /api/signals/active/"""
-        limit = int(request.query_params.get('limit', 20))
-        min_edge = float(request.query_params.get('min_edge', 15))
-        signals = get_active_signals(limit=limit, min_edge=min_edge)
-        return Response({"success": True, "count": len(signals), "signals": signals})
 
     # ---------- cleanup ----------
     @action(detail=False, methods=['post'])

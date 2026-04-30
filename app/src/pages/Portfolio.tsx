@@ -25,17 +25,18 @@ const Portfolio = () => {
     const fetch = async () => {
       setLoading(true);
       try {
-        const [profileRes, tradesRes, analyticsRes, qpiRes] = await Promise.all([
+        const [profileRes, tradesRes, analyticsRes] = await Promise.all([
           getProfile(),
           getTrades(),
           getAnalytics(),
-          getQPI(),
+          
         ]);
         if (profileRes.success) setProfile(profileRes.profile);
         if (tradesRes.success) setTrades(tradesRes.trades);
         if (analyticsRes.success) setAnalytics(analyticsRes.analytics);
-        if (qpiRes.success) setQpi(qpiRes.qpi);
+        // QPI fetched separately below
       } catch { /* ignore */ }
+      getQPI().then(res => { if (res?.success) setQpi(res.qpi); }).catch(() => {});
       setLoading(false);
     };
     fetch();
@@ -242,10 +243,10 @@ const Portfolio = () => {
         <div className="bg-[#0a0e17] rounded-lg p-4">
           <p className="text-sm text-[#8b92a8] leading-relaxed">
             Your last {analytics?.total_trades || 0} trades show a {analytics?.win_rate?.toFixed(0) || 0}% win rate
-            with {analytics?.total_pnl && analytics.total_pnl > 0 ? "positive" : "negative"} total PnL.
+            with {analytics?.total_pnl && analytics.total_pnl > 0 ? "positive" : analytics?.total_pnl && analytics.total_pnl < 0 ? "negative" : "no closed"} total PnL.
             {closedTrades.filter((t) => !t.kelly_compliant).length > 0
               ? ` You over-staked ${closedTrades.filter((t) => !t.kelly_compliant).length} times — Kelly discipline is your biggest improvement area.`
-              : " Excellent Kelly compliance. Keep it up."}
+              : closedTrades.length > 0 ? " Excellent Kelly compliance. Keep it up." : " Open trades pending resolution."}
           </p>
         </div>
       </div>

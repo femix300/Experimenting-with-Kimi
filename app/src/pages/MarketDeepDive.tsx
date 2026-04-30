@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useMarketStore } from "@/stores";
-import { analyzeMarket, getPriceHistory, getOrderBook } from "@/lib/api";
+import { analyzeMarket, getPriceHistory, getOrderBook, simulateTrade } from "@/lib/api";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   AreaChart, Area,
@@ -15,6 +15,8 @@ import {
   Coins,
   AlertTriangle,
   Zap,
+  X,
+  CheckCircle2,
 } from "lucide-react";
 import type { Signal, QuantMetrics, AIAnalysis } from "@/types";
 
@@ -37,7 +39,7 @@ const StatBlock = ({ label, value, color, tooltip }: { label: string; value: str
 const MarketDeepDive = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { selectedMarket, setSelectedMarket, setQuantMetrics, setAiAnalysis } = useMarketStore();
+  const { selectedMarket, quantMetrics: storeQuantMetrics, aiAnalysis: storeAiAnalysis, setSelectedMarket, setQuantMetrics, setAiAnalysis } = useMarketStore();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [signal, setSignal] = useState<Signal | null>(null);
@@ -46,10 +48,35 @@ const MarketDeepDive = () => {
   const [priceData, setPriceData] = useState<Array<{ time: string; price: number; prob: number }>>([]);
   const [orderBookData, setOrderBookData] = useState<{ bids: Array<{ price: number; quantity: number }>; asks: Array<{ price: number; quantity: number }> } | null>(null);
   const [riskMode, setRiskMode] = useState<"conservative" | "balanced" | "aggressive">("balanced");
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   useEffect(() => {
     if (!id) return;
     const run = async () => {
+      // If data already cached from Signal Feed, skip heavy analysis, just fetch charts
+            if (selectedMarket && storeQuantMetrics && storeAiAnalysis && sessionStorage.getItem("fromSignal") === "true") {
+        sessionStorage.removeItem("fromSignal");
+        setLoading(true);
+        try {
+          const [history, ob] = await Promise.all([
+            getPriceHistory(id!).catch(() => []),
+            getOrderBook(id!).catch(() => null),
+          ]);
+          if (Array.isArray(history) && history.length > 0) {
+            setPriceData(history.map((h: any) => ({
+              time: new Date(h.timestamp).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+              price: h.price,
+              prob: h.price * 100,
+            })));
+          }
+          if (ob) setOrderBookData(ob);
+          if (storeAiAnalysis) {
+            setLocalAiAnalysis(storeAiAnalysis);
+          }
+        } catch {}
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       try {
         const result = await analyzeMarket(id, 10000);
@@ -61,7 +88,6 @@ const MarketDeepDive = () => {
           setQuantMetrics(result.quant_metrics);
           setAiAnalysis(result.ai_analysis);
 
-          // Fetch price history
           try {
             const history = await getPriceHistory(id);
             const formatted = history.map((h) => ({
@@ -71,7 +97,6 @@ const MarketDeepDive = () => {
             }));
             setPriceData(formatted);
           } catch {
-            // Fallback mock
             setPriceData(
               Array.from({ length: 20 }).map((_, i) => ({
                 time: `Day ${i + 1}`,
@@ -81,12 +106,10 @@ const MarketDeepDive = () => {
             );
           }
 
-          // Fetch order book
           try {
             const ob = await getOrderBook(id);
             setOrderBookData(ob);
           } catch {
-            // Fallback mock
             setOrderBookData({
               bids: Array.from({ length: 10 }).map((_, i) => ({ price: 0.35 - i * 0.01, quantity: 1000 + Math.random() * 5000 })),
               asks: Array.from({ length: 10 }).map((_, i) => ({ price: 0.36 + i * 0.01, quantity: 800 + Math.random() * 4000 })),
@@ -126,18 +149,23 @@ const MarketDeepDive = () => {
     aggressive: signal?.recommended_stake_aggressive,
   };
 
+  const handleSimulateTrade = async () => {
+    const stake = kellyMap[riskMode];
+    if (!stake || !signal) return;
+    try {
+      await simulateTrade(signal.market_event_id, stake);
+      setToast({ message: `Trade simulated! ₦${stake.toLocaleString()} staked on "${signal.market_title?.slice(0, 40)}..."`, type: "success" });
+    } catch (err) {
+      setToast({ message: "Trade failed: " + (err instanceof Error ? err.message : "Unknown error"), type: "error" });
+    }
+  };
+
   if (loading && !market) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
         <div className="text-center">
           <Loader2 className="w-10 h-10 text-[#00d4ff] animate-spin mx-auto mb-4" />
           <p className="text-[#8b92a8]">Running 4-agent analysis pipeline...</p>
-          <div className="mt-4 space-y-2 text-xs text-[#5a6070]">
-            <p>Agent 01: Market Scanner</p>
-            <p>Agent 02: Quant Analyzer</p>
-            <p>Agent 03: AI Probability</p>
-            <p>Agent 04: Signal Generator</p>
-          </div>
         </div>
       </div>
     );
@@ -157,7 +185,35 @@ const MarketDeepDive = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Toast Notification */}
+      {toast && (
+        <div style={{
+          position: "fixed",
+          bottom: "24px",
+          right: "24px",
+          zIndex: 9999,
+          display: "flex",
+          alignItems: "center",
+          gap: "12px",
+          padding: "16px 20px",
+          borderRadius: "12px",
+          minWidth: "360px",
+          backgroundColor: toast.type === "success" ? "#0a2e1a" : "#2e0a0a",
+          border: toast.type === "success" ? "1px solid rgba(0,255,136,0.4)" : "1px solid rgba(255,71,87,0.4)",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+        }}>
+          {toast.type === "success" ? (
+            <CheckCircle2 style={{ width: 20, height: 20, color: "#00ff88", flexShrink: 0 }} />
+          ) : (
+            <AlertTriangle style={{ width: 20, height: 20, color: "#ff4757", flexShrink: 0 }} />
+          )}
+          <span style={{ color: "#dee2f5", fontSize: "14px", flex: 1 }}>{toast.message}</span>
+          <button onClick={() => setToast(null)} style={{ background: "none", border: "none", cursor: "pointer" }}>
+            <X style={{ width: 16, height: 16, color: "#8b92a8" }} />
+          </button>
+        </div>
+      )}
+      
       <button
         onClick={() => navigate("/markets")}
         className="flex items-center gap-2 text-sm text-[#8b92a8] hover:text-[#dee2f5] transition-colors"
@@ -285,7 +341,6 @@ const MarketDeepDive = () => {
               color={signal.direction === "BUY" ? "text-[#00ff88]" : signal.direction === "SELL" ? "text-[#ff4757]" : "text-[#ffa502]"} />
           </div>
 
-          {/* Risk Tolerance Selector */}
           <div className="mb-4">
             <p className="text-xs text-[#8b92a8] mb-2">Risk Tolerance</p>
             <div className="flex gap-2">
@@ -312,7 +367,10 @@ const MarketDeepDive = () => {
                 ₦{kellyMap[riskMode]?.toLocaleString() || "0"}
               </p>
             </div>
-            <button className="px-6 py-3 bg-[#00ff88] text-[#0a0e17] rounded-lg font-bold text-sm hover:brightness-110 transition-all flex items-center gap-2">
+            <button
+              onClick={handleSimulateTrade}
+              className="px-6 py-3 bg-[#00ff88] text-[#0a0e17] rounded-lg font-bold text-sm hover:brightness-110 transition-all flex items-center gap-2"
+            >
               <Coins className="w-4 h-4" />
               Simulate Trade
             </button>

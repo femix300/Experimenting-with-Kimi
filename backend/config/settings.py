@@ -54,6 +54,9 @@ INSTALLED_APPS = [
     'users',
     'health',
 
+    # api docs
+    'drf_spectacular',
+
     # others
     'django_extensions',
 ]
@@ -166,6 +169,13 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'EdgeIQ API',
+    'DESCRIPTION': 'AI Quant Intelligence Platform for Prediction Market Traders',
+    'VERSION': '1.0.0',
 }
 
 

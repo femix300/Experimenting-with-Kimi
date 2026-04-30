@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { usePortfolioStore, useAuthStore } from "@/stores";
-import { updateProfile as apiUpdateProfile } from "@/lib/api";
+import { getProfile, updateProfile as apiUpdateProfile } from "@/lib/api";
 import {
   Settings as SettingsIcon,
   Wallet,
@@ -36,9 +36,29 @@ const CATEGORIES = [
 const Settings = () => {
   const { profile, updateProfile } = usePortfolioStore();
   const { logout } = useAuthStore();
-  const [bankroll, setBankroll] = useState(profile?.bankroll || 10000);
+  const [bankroll, setBankroll] = useState(profile?.bankroll || 0);
   const [risk, setRisk] = useState<"conservative" | "balanced" | "aggressive">(profile?.risk_tolerance || "balanced");
   const [tracked, setTracked] = useState<string[]>(profile?.tracked_categories || ["crypto", "sports"]);
+  // Sync bankroll when profile loads
+  useEffect(() => {
+    if (profile?.bankroll) setBankroll(Math.round(profile.bankroll * 100) / 100);
+    if (profile?.risk_tolerance) setRisk(profile.risk_tolerance);
+    if (profile?.tracked_categories) setTracked(profile.tracked_categories);
+  }, [profile]);
+  // Fetch profile on mount
+
+  useEffect(() => {
+
+    getProfile().then(res => {
+      if (res.success && res.profile) {
+        setBankroll(Math.round((res.profile.bankroll || 0) * 100) / 100);
+        setRisk(res.profile.risk_tolerance || "balanced");
+        setTracked(res.profile.tracked_categories || ["crypto", "sports"]);
+        updateProfile(res.profile);
+      }
+    }).catch(() => {});
+
+  }, []);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
