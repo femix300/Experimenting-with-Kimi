@@ -135,7 +135,7 @@ export const useSignalStore = create<SignalState>((set) => ({
   stats: null,
   loading: false,
   error: null,
-  minEdgeFilter: 15,
+  minEdgeFilter: 0,
   categoryFilter: null,
   setSignals: (signals) => set({ signals }),
   setActiveSignals: (activeSignals) => set({ activeSignals }),

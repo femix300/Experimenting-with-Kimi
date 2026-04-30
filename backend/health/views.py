@@ -7,7 +7,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from services.bayse_client import BayseClient
 from services.gemini_client import GeminiClient
-from utils.firebase_client import FirebaseClient
+from utils.firebase_client import FirestoreClient
 import os
 
 
@@ -52,7 +52,7 @@ def health_check(request):
 
     # Check Firestore
     try:
-        fb_client = FirebaseClient()
+        fb_client = FirestoreClient()
         # Try to read a document
         test_doc = fb_client.db.collection("health_checks").document("ping")
         test_doc.set({"timestamp": time.time(), "status": "ok"})

@@ -25,8 +25,12 @@ const CATEGORY_CONFIG = [
   { key: "other", label: "Other", color: "#a4b0be" },
 ];
 
-const formatTimeRemaining = (hours?: number) => {
-  if (!hours || hours <= 0) return "Closed";
+const formatTimeRemaining = (hours?: number, status?: string) => {
+  if (!hours || hours <= 0) {
+    if (status === "open") return "Active";
+    if (status === "resolved") return "Resolved";
+    return "Closed";
+  }
   const days = Math.floor(hours / 24);
   const hrs = Math.floor(hours % 24);
   if (days > 0) return `${days}d ${hrs}h`;
@@ -94,7 +98,7 @@ const MarketCard = ({ market, onClick, hasEdge }: { market: Market; onClick: () 
         </div>
         <span className="flex items-center gap-1">
           <Clock className="w-3 h-3" />
-          {formatTimeRemaining(market.time_remaining_hours)}
+          {formatTimeRemaining(market.time_remaining_hours, market.status)}
         </span>
       </div>
     </div>
@@ -126,7 +130,7 @@ const MarketRow = ({ market, onClick, hasEdge }: { market: Market; onClick: () =
       <td className="py-3 px-4 text-sm font-mono-num text-[#dee2f5]">₦{market.current_price?.toFixed(2)}</td>
       <td className="py-3 px-4 text-sm font-mono-num text-[#00d4ff]">{prob.toFixed(1)}%</td>
       <td className="py-3 px-4 text-sm font-mono-num text-[#8b92a8]">{formatVolume(market.total_volume || 0)}</td>
-      <td className="py-3 px-4 text-sm font-mono-num text-[#8b92a8]">{formatTimeRemaining(market.time_remaining_hours)}</td>
+      <td className="py-3 px-4 text-sm font-mono-num text-[#8b92a8]">{formatTimeRemaining(market.time_remaining_hours, market.status)}</td>
       <td className="py-3 px-4">
         <ChevronRight className="w-4 h-4 text-[#00d4ff]" />
       </td>
@@ -266,6 +270,28 @@ const MarketsExplorer = () => {
                   }
                 >
                   {cat.label}
+                </button>
+              ))}
+            </div>
+            {/* Status Filter */}
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <span className="text-xs text-[#8b92a8] mr-1">Status:</span>
+              {[
+                { key: "open", label: "Active" },
+                { key: "closed", label: "Closed" },
+                { key: "resolved", label: "Resolved" },
+                { key: "", label: "All" },
+              ].map((opt) => (
+                <button
+                  key={opt.key}
+                  onClick={() => setFilters({ status: opt.key })}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    filters.status === opt.key
+                      ? "bg-[#00d4ff]/10 text-[#00d4ff] border border-[#00d4ff]/30"
+                      : "bg-[#0a0e17] text-[#8b92a8] border border-[#1a2030] hover:text-[#dee2f5]"
+                  }`}
+                >
+                  {opt.label}
                 </button>
               ))}
             </div>
