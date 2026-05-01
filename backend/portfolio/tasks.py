@@ -1,25 +1,28 @@
-"""
-Celery tasks for portfolio operations
-"""
+"""Celery tasks for portfolio operations (Firestore-only)."""
 from celery import shared_task
-from django.contrib.auth.models import User
+from utils.firebase_client import fs, Collection
 import logging
 
 logger = logging.getLogger(__name__)
 
-
 @shared_task
 def async_calculate_portfolio_analytics(user_id=None):
-    """
-    Calculate portfolio analytics in background
-    """
+    """Calculate portfolio analytics in background."""
     from .analytics import calculate_portfolio_metrics
-    
+
+    # Look up user from Firestore instead of SQLite
+    user_data = None
     if user_id:
-        user = User.objects.get(id=user_id)
-    else:
-        user, _ = User.objects.get_or_create(username='default_user')
+        user_data = fs.get(Collection.USER_PROFILES, str(user_id))
     
-    metrics = calculate_portfolio_metrics(user)
-    logger.info(f"Portfolio analytics calculated for {user.username}")
+    if not user_data:
+        # Use a default anonymous profile
+        user_data = {
+            "id": "default_user",
+            "username": "default_user",
+            "bankroll": 10000,
+        }
+
+    metrics = calculate_portfolio_metrics(user_data)
+    logger.info(f"Portfolio analytics calculated for {user_data.get('username', 'anonymous')}")
     return metrics

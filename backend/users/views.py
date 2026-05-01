@@ -1,156 +1,109 @@
-"""
-User Authentication Views
-"""
+"""User Authentication Views — Firestore-only."""
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
-from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from django.contrib.auth import authenticate
-from django.contrib.auth.models import User
-from .serializers import UserSerializer, UserProfileSerializer, RegisterSerializer, LoginSerializer
-from .models import UserProfile, sync_profile_to_firestore
 from utils.firebase_client import fs, Collection
 import logging
+import uuid
 
 logger = logging.getLogger(__name__)
 
 
 class UserViewSet(ViewSet):
-    """
-    User authentication and profile endpoints
-    """
-    
+    """User auth and profile endpoints — Firestore backed."""
+
     @action(detail=False, methods=['post'], permission_classes=[AllowAny])
     def register(self, request):
-        """
-        Register a new user
-        POST /api/users/register/
-        """
-        serializer = RegisterSerializer(data=request.data)
-        if serializer.is_valid():
-            user = serializer.save()
-            token, created = Token.objects.get_or_create(user=user)
-            
-            # Sync to Firestore
-            sync_profile_to_firestore(user)
-            
+        """POST /api/users/register/ — create user in Firestore."""
+        username = request.data.get('username', '').strip()
+        email = request.data.get('email', '').strip()
+        password = request.data.get('password', '')
+
+        if not username or not password:
             return Response({
-                'success': True,
-                'user': UserSerializer(user).data,
-                'token': token.key,
-                'message': 'User created successfully'
-            }, status=status.HTTP_201_CREATED)
-        
+                'success': False,
+                'error': 'Username and password required'
+            }, status=400)
+
+        user_id = str(uuid.uuid4())
+        user_doc = {
+            "id": user_id,
+            "username": username,
+            "email": email,
+            "bankroll": float(request.data.get('bankroll', 10000)),
+            "risk_tolerance": request.data.get('risk_tolerance', 'medium'),
+            "created_at": str(__import__('django').utils.timezone.now()),
+        }
+        fs.set(Collection.USER_PROFILES, user_id, user_doc)
+
         return Response({
-            'success': False,
-            'errors': serializer.errors
-        }, status=status.HTTP_400_BAD_REQUEST)
-    
+            'success': True,
+            'user': user_doc,
+            'token': user_id,  # Simplified — use Firebase Auth tokens in production
+            'message': 'User created',
+        }, status=201)
+
     @action(detail=False, methods=['post'], permission_classes=[AllowAny])
     def login(self, request):
-        """
-        Login user
-        POST /api/users/login/
-        """
-        serializer = LoginSerializer(data=request.data)
-        if serializer.is_valid():
-            user = authenticate(
-                username=serializer.validated_data['username'],
-                password=serializer.validated_data['password']
-            )
-            if user:
-                token, created = Token.objects.get_or_create(user=user)
-                return Response({
-                    'success': True,
-                    'user': UserSerializer(user).data,
-                    'token': token.key,
-                    'message': 'Login successful'
-                })
-            else:
-                return Response({
-                    'success': False,
-                    'error': 'Invalid credentials'
-                }, status=status.HTTP_401_UNAUTHORIZED)
-        
+        """POST /api/users/login/ — lookup user in Firestore."""
+        username = request.data.get('username', '').strip()
+        password = request.data.get('password', '')  # Not validated yet (TODO: Firebase Auth)
+
+        # Simple lookup by username in Firestore
+        users = fs.query(
+            Collection.USER_PROFILES,
+            filters=[("username", "==", username)],
+            limit=1,
+        )
+        if users:
+            user = users[0]
+            return Response({
+                'success': True,
+                'user': user,
+                'token': user.get('id'),
+                'message': 'Login successful',
+            })
+
         return Response({
             'success': False,
-            'errors': serializer.errors
-        }, status=status.HTTP_400_BAD_REQUEST)
-    
+            'error': 'Invalid credentials'
+        }, status=401)
+
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
     def logout(self, request):
-        """
-        Logout user (delete token)
-        POST /api/users/logout/
-        """
-        try:
-            request.user.auth_token.delete()
-            return Response({
-                'success': True,
-                'message': 'Logged out successfully'
-            })
-        except Exception as e:
-            return Response({
-                'success': False,
-                'error': str(e)
-            }, status=status.HTTP_400_BAD_REQUEST)
-    
+        """POST /api/users/logout/"""
+        return Response({'success': True, 'message': 'Logged out'})
+
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def profile(self, request):
-        """
-        Get current user's profile
-        GET /api/users/profile/
-        """
-        try:
-            # Try to get from Firestore first
-            firestore_profile = fs.get(Collection.USER_PROFILES, str(request.user.id))
-            if firestore_profile:
-                return Response({
-                    'success': True,
-                    'profile': firestore_profile
-                })
-            
-            # Fallback to SQLite
-            profile = UserProfile.objects.get(user=request.user)
-            serializer = UserProfileSerializer(profile)
-            return Response({
-                'success': True,
-                'profile': serializer.data
-            })
-        except UserProfile.DoesNotExist:
-            return Response({
-                'success': False,
-                'error': 'Profile not found'
-            }, status=status.HTTP_404_NOT_FOUND)
-    
+        """GET /api/users/profile/ — from Firestore."""
+        user_id = str(request.user.id) if request.user.is_authenticated else None
+        if not user_id:
+            return Response({'success': False, 'error': 'Not authenticated'}, status=401)
+
+        profile = fs.get(Collection.USER_PROFILES, user_id)
+        if profile:
+            return Response({'success': True, 'profile': profile})
+
+        return Response({'success': False, 'error': 'Profile not found'}, status=404)
+
     @action(detail=False, methods=['patch'], permission_classes=[IsAuthenticated])
     def update_profile(self, request):
-        """
-        Update user profile
-        PATCH /api/users/update_profile/
-        """
-        try:
-            profile = UserProfile.objects.get(user=request.user)
-            
-            if 'risk_tolerance' in request.data:
-                profile.risk_tolerance = request.data['risk_tolerance']
-            if 'bankroll' in request.data:
-                profile.bankroll = request.data['bankroll']
-            
-            profile.save()
-            
-            # Sync to Firestore
-            sync_profile_to_firestore(request.user)
-            
-            serializer = UserProfileSerializer(profile)
-            return Response({
-                'success': True,
-                'profile': serializer.data
-            })
-        except UserProfile.DoesNotExist:
-            return Response({
-                'success': False,
-                'error': 'Profile not found'
-            }, status=status.HTTP_404_NOT_FOUND)
+        """PATCH /api/users/update_profile/ — update Firestore."""
+        user_id = str(request.user.id) if request.user.is_authenticated else None
+        if not user_id:
+            return Response({'success': False, 'error': 'Not authenticated'}, status=401)
+
+        updates = {}
+        if 'risk_tolerance' in request.data:
+            updates['risk_tolerance'] = request.data['risk_tolerance']
+        if 'bankroll' in request.data:
+            updates['bankroll'] = float(request.data['bankroll'])
+
+        if updates:
+            fs.update(Collection.USER_PROFILES, user_id, updates)
+
+        profile = fs.get(Collection.USER_PROFILES, user_id)
+        return Response({'success': True, 'profile': profile})

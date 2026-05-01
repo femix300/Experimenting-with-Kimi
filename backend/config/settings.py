@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'backtesting',
     'users',
     'health',
+    'auth_app',
 
     # api docs
     'drf_spectacular',
@@ -164,8 +165,7 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny' if DEBUG else
-        'rest_framework.permissions.IsAuthenticated',  # Require auth by default
+        'rest_framework.permissions.AllowAny',  # Public access (Firebase auth via middleware)
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
@@ -227,3 +227,11 @@ CELERY_BEAT_SCHEDULE = {
 
 # Firebase
 FIREBASE_CREDENTIALS_PATH = config('FIREBASE_CREDENTIALS_PATH')
+# Firebase Authentication
+AUTHENTICATION_BACKENDS = [
+    'auth_app.firebase_auth.FirebaseAuthBackend',
+    'django.contrib.auth.backends.ModelBackend',  # Fallback for admin
+]
+
+# CORS - Allow React frontend
+CORS_ALLOW_ALL_ORIGINS = True  # Tighten this in production
