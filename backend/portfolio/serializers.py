@@ -26,6 +26,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'kelly_multiplier',
             'created_at',
             'updated_at',
+            'tracked_categories',
         ]
         read_only_fields = ['total_trades', 'winning_trades', 'total_pnl']
     

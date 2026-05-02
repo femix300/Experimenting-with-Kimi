@@ -21,7 +21,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def generate_signal(market_event_id: str, user_bankroll: float = 10000) -> dict:
+def generate_signal(market_event_id: str, user_id: str = "anonymous", user_bankroll: float = 10000) -> dict:
     """
     Generate a complete trading signal for a market.
 
@@ -134,8 +134,9 @@ def generate_signal(market_event_id: str, user_bankroll: float = 10000) -> dict:
 
     # 6. Write new signal to Firestore
     now = timezone.now()
-    signal_doc_id = f"{market_event_id}_signal"
+    signal_doc_id = f"{market_event_id}_{user_id}"
     signal_doc = {
+        "user_id": user_id,
         "market_id": market_event_id,
         "market_title": market.get("title", ""),
         "market_event_id": market.get("bayse_event_id", ""),
@@ -172,32 +173,17 @@ def generate_signal(market_event_id: str, user_bankroll: float = 10000) -> dict:
 
 
 def _archive_existing_signal(market_event_id: str):
-    """
-    Move the current active signal to a history subcollection before overwriting.
-    This preserves signal lineage without accumulating endless top-level docs.
-    """
-    from django.utils import timezone
-    
-    old = fs.get(Collection.SIGNALS, f"{market_event_id}_signal")
-    if old:
-        old["archived_at"] = timezone.now()
-        old["is_active"] = False
-        archive_id = f"{market_event_id}_{old.get('created_at', 'unknown')}"
-        fs.set_subdoc(
-            parent_collection=Collection.SIGNALS,
-            parent_id=f"{market_event_id}_signal",
-            sub_collection="history",
-            subdoc_id=archive_id,
-            data=old,
-        )
-        logger.info(f"Archived old signal for market {market_event_id}")
+    """No-op: signals are per-user so no overwriting occurs."""
+    pass
 
 
-def get_active_signals(limit=20, min_edge=15) -> list[dict]:
+def get_active_signals(limit=20, min_edge=15, user_id: str = None) -> list[dict]:
     """
     Get active signals from Firestore (replaces ORM query).
     """
     filters = [("is_active", "==", True)]
+    if user_id:
+        filters.append(("user_id", "==", user_id))
     if min_edge:
         filters.append(("edge_score", ">=", min_edge))
 

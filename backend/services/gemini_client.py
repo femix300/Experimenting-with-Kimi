@@ -22,9 +22,18 @@ class AIAnalysisSchema(BaseModel):
 
 # Available models in order of preference
 AVAILABLE_MODELS = [
-    'gemini-2.5-flash',
-    'gemini-2.5-pro',
-    'gemini-2.0-flash',
+    #'gemini-2.5-flash',
+    #'gemini-2.5-pro',
+    #'gemini-2.5-flash-lite',
+    #'gemini-2.0-flash',
+    #'gemini-2.0-flash-lite',
+    'gemini-flash-latest',
+    'gemini-pro-latest',
+    'gemini-flash-lite-latest',
+    'gemini-3-flash-preview',
+    'gemini-3-pro-preview',
+    'gemini-3.1-pro-preview',
+    'gemini-3.1-flash-lite-preview',
 ]
 class GeminiClient:
     """Client for Google Gemini AI with automatic model failover"""

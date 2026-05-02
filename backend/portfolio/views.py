@@ -7,6 +7,7 @@ Portfolio API Views (Firestore Refactored) with User Authentication
 """
 from rest_framework import status
 from rest_framework.decorators import action
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 from rest_framework.permissions import IsAuthenticated
@@ -14,6 +15,7 @@ from django.utils import timezone
 from decimal import Decimal
 from utils.firebase_client import fs, Collection
 import logging
+from django.utils.decorators import method_decorator
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +29,7 @@ def _get_or_create_profile(user_id, username="trader"):
             "username": username,
             "bankroll": 10000.0,
             "risk_tolerance": "balanced",
+            "tracked_categories": ["crypto", "sports"],
             "total_trades": 0,
             "winning_trades": 0,
             "total_pnl": 0.0,
@@ -47,7 +50,7 @@ class PortfolioViewSet(ViewSet):
     
     def _get_user_id(self, request):
         """Get the current user's ID from the request."""
-        return str(request.user.id)
+        return str(request.user.username)
     
     # ---------- profile ----------
     @action(detail=False, methods=['get'])
@@ -71,6 +74,7 @@ class PortfolioViewSet(ViewSet):
         })
 
     # ---------- update_profile ----------
+    @method_decorator(csrf_exempt)
     @action(detail=False, methods=['post'])
     def update_profile(self, request):
         """POST /api/portfolio/update_profile/"""
@@ -87,6 +91,9 @@ class PortfolioViewSet(ViewSet):
                 if risk in ('conservative', 'balanced', 'aggressive'):
                     updates["risk_tolerance"] = risk
             
+            if 'tracked_categories' in request.data:
+                updates["tracked_categories"] = list(request.data['tracked_categories'])
+
             if 'username' in request.data:
                 updates["username"] = str(request.data['username'])
 

@@ -1,256 +1,184 @@
 import { useEffect, useState } from "react";
 import { useBacktestStore } from "@/stores";
-import { getBacktestStrategies, runBacktest } from "@/lib/api";
-import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-} from "recharts";
+import { getBacktestStrategies, runBacktest, getBacktestResults } from "@/lib/api";
 import {
   FlaskConical,
-  Play,
   Loader2,
-  Trophy,
-  TrendingDown,
-  TrendingUp,
-  Activity,
-  Target,
-  CheckCircle,
-  XCircle,
+  Play,
 } from "lucide-react";
 
 const Backtester = () => {
-  const { strategies, results, loading, selectedStrategy, setStrategies, setResults, setLoading, setSelectedStrategy } = useBacktestStore();
-  const [config, setConfig] = useState({ min_edge: 15, min_momentum: 10, categories: [] as string[] });
-  const [initialBankroll, setInitialBankroll] = useState(10000);
+  const { strategies, results, history, setStrategies, setResults, setHistory, setLoading } = useBacktestStore();
+  const [loading, setLocalLoading] = useState(true);
+  const [running, setRunning] = useState(false);
+  const [selectedStrategy, setSelectedStrategy] = useState<string | null>(null);
+  const [bankroll, setBankroll] = useState(10000);
 
   useEffect(() => {
     const fetch = async () => {
+      setLocalLoading(true);
+      setLoading(true);
       try {
-        const res = await getBacktestStrategies();
-        if (res.success) setStrategies(res.strategies);
+        const [stratRes, histRes] = await Promise.all([
+          getBacktestStrategies(),
+          getBacktestResults(),
+        ]);
+        if (stratRes.success) setStrategies(stratRes.strategies);
+        if (histRes.success) setHistory(histRes.results);
       } catch { /* ignore */ }
+      setLocalLoading(false);
+      setLoading(false);
     };
     fetch();
   }, []);
 
   const handleRun = async () => {
-    setLoading(true);
+    if (!selectedStrategy) return;
+    const strategy = strategies.find((s) => s.id === selectedStrategy);
+    if (!strategy) return;
+
+    setRunning(true);
     try {
-      const res = await runBacktest(config, initialBankroll);
-      if (res.success) setResults(res.result);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Backtest failed");
-    } finally {
-      setLoading(false);
-    }
+      const res = await runBacktest(strategy.params, bankroll);
+      if (res.success) {
+        setResults(res.result);
+        const hist = await getBacktestResults();
+        if (hist.success) setHistory(hist.results);
+      }
+    } catch { /* ignore */ }
+    setRunning(false);
   };
 
-  const equityCurve = results?.trade_log?.map((t, i) => ({
-    trade: i + 1,
-    pnl: t.pnl,
-    cumulative: results.trade_log.slice(0, i + 1).reduce((sum, tr) => sum + tr.pnl, 0),
-  })) || [];
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <Loader2 className="w-10 h-10 text-[#00d4ff] animate-spin" />
+      </div>
+    );
+  }
 
-  const _winLossData = results ? [results.winning_trades, results.losing_trades] : [0, 0];
-  void _winLossData;
+  const formatPercent = (v: number) => `${Number(v).toFixed(1)}%`;
+  const formatMoney = (v: number) => `₦${Number(v).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-[#dee2f5] flex items-center gap-2">
           <FlaskConical className="w-6 h-6 text-[#00d4ff]" />
-          Strategy Backtester
+          Backtester
         </h1>
-        <p className="text-sm text-[#8b92a8] mt-1">Test your quant strategy against historical Bayse data</p>
+        <p className="text-sm text-[#8b92a8] mt-1">Simulate strategies on historical market data</p>
       </div>
 
-      {/* Strategy Config */}
-      <div className="bg-[#131a2b] rounded-xl border border-[#1a2030] p-6 space-y-4">
-        <h3 className="text-sm font-semibold text-[#dee2f5]">Strategy Configuration</h3>
-
-        {/* Presets */}
-        <div className="flex flex-wrap gap-2">
+      {/* Strategy Selector */}
+      <div className="bg-[#131a2b] rounded-xl border border-[#1a2030] p-6">
+        <h3 className="text-sm font-semibold text-[#dee2f5] mb-4">Select Strategy</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
           {strategies.map((s) => (
             <button
               key={s.id}
-              onClick={() => {
-                setSelectedStrategy(s.id);
-                setConfig({
-                  min_edge: s.params.min_edge || 15,
-                  min_momentum: s.params.min_momentum || 10,
-                  categories: config.categories,
-                });
-              }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              onClick={() => setSelectedStrategy(s.id)}
+              className={`p-4 rounded-lg border text-left transition-all ${
                 selectedStrategy === s.id
-                  ? "bg-[#00d4ff]/20 text-[#00d4ff] border border-[#00d4ff]/30"
-                  : "bg-[#0a0e17] text-[#8b92a8] border border-[#1a2030]"
+                  ? "bg-[#00d4ff]/10 border-[#00d4ff]/30"
+                  : "bg-[#0a0e17] border-[#1a2030] hover:border-[#2a3040]"
               }`}
             >
-              {s.name}
+              <p className={`text-sm font-medium ${selectedStrategy === s.id ? "text-[#00d4ff]" : "text-[#dee2f5]"}`}>
+                {s.name}
+              </p>
+              <p className="text-xs text-[#8b92a8] mt-1">{s.description}</p>
             </button>
           ))}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="text-xs text-[#8b92a8] mb-1 block">Min Edge Threshold (%)</label>
-            <input
-              type="range"
-              min="5"
-              max="30"
-              value={config.min_edge}
-              onChange={(e) => setConfig({ ...config, min_edge: Number(e.target.value) })}
-              className="w-full accent-[#00d4ff]"
-            />
-            <p className="text-xs text-[#00d4ff] font-mono-num mt-1">{config.min_edge}%</p>
-          </div>
-          <div>
-            <label className="text-xs text-[#8b92a8] mb-1 block">Min Momentum</label>
-            <input
-              type="range"
-              min="0"
-              max="50"
-              value={config.min_momentum}
-              onChange={(e) => setConfig({ ...config, min_momentum: Number(e.target.value) })}
-              className="w-full accent-[#00d4ff]"
-            />
-            <p className="text-xs text-[#00d4ff] font-mono-num mt-1">{config.min_momentum}</p>
-          </div>
-          <div>
-            <label className="text-xs text-[#8b92a8] mb-1 block">Initial Bankroll (₦)</label>
-            <input
-              type="number"
-              value={initialBankroll}
-              onChange={(e) => setInitialBankroll(Number(e.target.value))}
-              className="w-full px-3 py-2 bg-[#0a0e17] border border-[#1a2030] rounded-lg text-sm text-[#dee2f5] focus:outline-none focus:border-[#00d4ff]/50"
-            />
-          </div>
+        <div className="flex items-center gap-3 mb-4">
+          <span className="text-sm text-[#8b92a8]">Bankroll:</span>
+          <input
+            type="number"
+            value={bankroll}
+            onChange={(e) => setBankroll(Number(e.target.value))}
+            className="px-3 py-2 bg-[#0a0e17] border border-[#1a2030] rounded-lg text-sm text-[#dee2f5] font-mono-num focus:outline-none focus:border-[#00d4ff]/50 w-40"
+          />
         </div>
 
         <button
           onClick={handleRun}
-          disabled={loading}
+          disabled={running || !selectedStrategy}
           className="flex items-center gap-2 px-6 py-3 bg-[#00d4ff] text-[#0a0e17] rounded-lg font-bold text-sm hover:brightness-110 transition-all disabled:opacity-50"
         >
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-          {loading ? "Running Simulation..." : "Run Backtest"}
+          {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+          {running ? "Running..." : "Run Backtest"}
         </button>
       </div>
 
       {/* Results */}
       {results && (
-        <>
-          {/* Stat Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="bg-[#131a2b] rounded-lg p-4 border border-[#1a2030]">
-              <div className="flex items-center gap-2 mb-2">
-                <Trophy className="w-4 h-4 text-[#00d4ff]" />
-                <span className="text-xs text-[#8b92a8]">Win Rate</span>
-              </div>
-              <p className="text-2xl font-bold font-mono-num text-[#00ff88]">{(results.win_rate * 100).toFixed(1)}%</p>
+        <div className="bg-[#131a2b] rounded-xl border border-[#1a2030] p-6">
+          <h3 className="text-sm font-semibold text-[#dee2f5] mb-4">Backtest Results</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+            <div className="bg-[#0a0e17] rounded-lg p-3">
+              <p className="text-[10px] uppercase text-[#8b92a8]">Total Trades</p>
+              <p className="text-lg font-bold font-mono-num text-[#dee2f5]">{results.total_trades}</p>
             </div>
-            <div className="bg-[#131a2b] rounded-lg p-4 border border-[#1a2030]">
-              <div className="flex items-center gap-2 mb-2">
-                <TrendingUp className="w-4 h-4 text-[#00d4ff]" />
-                <span className="text-xs text-[#8b92a8]">Total Return</span>
-              </div>
-              <p className="text-2xl font-bold font-mono-num text-[#00ff88]">+{(results.total_return * 100).toFixed(1)}%</p>
+            <div className="bg-[#0a0e17] rounded-lg p-3">
+              <p className="text-[10px] uppercase text-[#8b92a8]">Win Rate</p>
+              <p className="text-lg font-bold font-mono-num text-[#00ff88]">{formatPercent(results.win_rate)}</p>
             </div>
-            <div className="bg-[#131a2b] rounded-lg p-4 border border-[#1a2030]">
-              <div className="flex items-center gap-2 mb-2">
-                <TrendingDown className="w-4 h-4 text-[#ff4757]" />
-                <span className="text-xs text-[#8b92a8]">Max Drawdown</span>
-              </div>
-              <p className="text-2xl font-bold font-mono-num text-[#ff4757]">{(results.max_drawdown * 100).toFixed(1)}%</p>
+            <div className="bg-[#0a0e17] rounded-lg p-3">
+              <p className="text-[10px] uppercase text-[#8b92a8]">Total Return</p>
+              <p className={`text-lg font-bold font-mono-num ${results.total_return >= 0 ? "text-[#00ff88]" : "text-[#ff4757]"}`}>
+                {results.total_return >= 0 ? "+" : ""}{formatPercent(results.total_return)}
+              </p>
             </div>
-            <div className="bg-[#131a2b] rounded-lg p-4 border border-[#1a2030]">
-              <div className="flex items-center gap-2 mb-2">
-                <Activity className="w-4 h-4 text-[#00d4ff]" />
-                <span className="text-xs text-[#8b92a8]">Sharpe Ratio</span>
-              </div>
-              <p className="text-2xl font-bold font-mono-num text-[#00d4ff]">{results.sharpe_ratio.toFixed(2)}</p>
+            <div className="bg-[#0a0e17] rounded-lg p-3">
+              <p className="text-[10px] uppercase text-[#8b92a8]">Max Drawdown</p>
+              <p className="text-lg font-bold font-mono-num text-[#ff4757]">{formatPercent(results.max_drawdown)}</p>
             </div>
           </div>
 
-          {/* Equity Curve */}
-          <div className="bg-[#131a2b] rounded-xl border border-[#1a2030] p-6">
-            <h3 className="text-sm font-semibold text-[#dee2f5] mb-4">Equity Curve</h3>
-            <div className="h-[250px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={equityCurve}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1a2030" />
-                  <XAxis dataKey="trade" stroke="#5a6070" fontSize={11} />
-                  <YAxis stroke="#5a6070" fontSize={11} />
-                  <Tooltip contentStyle={{ backgroundColor: "#131a2b", border: "1px solid #1a2030", borderRadius: 8 }} />
-                  <Line type="monotone" dataKey="cumulative" stroke="#00d4ff" strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <div className="bg-[#0a0e17] rounded-lg p-3">
+              <p className="text-[10px] uppercase text-[#8b92a8]">Sharpe Ratio</p>
+              <p className="text-lg font-bold font-mono-num text-[#ffa502]">{Number(results.sharpe_ratio).toFixed(2)}</p>
+            </div>
+            <div className="bg-[#0a0e17] rounded-lg p-3">
+              <p className="text-[10px] uppercase text-[#8b92a8]">Wins / Losses</p>
+              <p className="text-lg font-bold font-mono-num text-[#dee2f5]">
+                {results.winning_trades} / {results.losing_trades}
+              </p>
             </div>
           </div>
+        </div>
+      )}
 
-          {/* Trade Log */}
-          <div className="bg-[#131a2b] rounded-xl border border-[#1a2030] overflow-hidden">
-            <div className="p-4 border-b border-[#1a2030]">
-              <h3 className="text-sm font-semibold text-[#dee2f5]">Trade Log</h3>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-[#1a2030] text-xs text-[#8b92a8] uppercase">
-                    <th className="py-3 px-4 text-left">Market</th>
-                    <th className="py-3 px-4 text-left">Action</th>
-                    <th className="py-3 px-4 text-left">Edge</th>
-                    <th className="py-3 px-4 text-left">Outcome</th>
-                    <th className="py-3 px-4 text-left">PnL</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {results.trade_log?.slice(0, 20).map((trade, i) => (
-                    <tr key={i} className="border-b border-[#1a2030]/50 hover:bg-[#1a2030]/30">
-                      <td className="py-3 px-4 text-sm text-[#dee2f5]">{trade.market_title}</td>
-                      <td className="py-3 px-4">
-                        <span className={`text-xs font-bold ${trade.action === "BUY" ? "text-[#00ff88]" : "text-[#ff4757]"}`}>
-                          {trade.action}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-sm font-mono-num text-[#00d4ff]">{trade.edge.toFixed(1)}%</td>
-                      <td className="py-3 px-4">
-                        {trade.is_win ? (
-                          <CheckCircle className="w-4 h-4 text-[#00ff88]" />
-                        ) : (
-                          <XCircle className="w-4 h-4 text-[#ff4757]" />
-                        )}
-                      </td>
-                      <td className={`py-3 px-4 text-sm font-mono-num ${trade.pnl > 0 ? "text-[#00ff88]" : "text-[#ff4757]"}`}>
-                        {trade.pnl > 0 ? "+" : ""}₦{trade.pnl.toFixed(2)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+      {/* History */}
+      {history.length > 0 && (
+        <div className="bg-[#131a2b] rounded-xl border border-[#1a2030] overflow-hidden">
+          <div className="p-4 border-b border-[#1a2030]">
+            <h3 className="text-sm font-semibold text-[#dee2f5]">Backtest History</h3>
           </div>
-
-          {/* Gemini Review Placeholder */}
-          <div className="bg-[#131a2b] rounded-xl border border-[#1a2030] p-6">
-            <h3 className="text-sm font-semibold text-[#dee2f5] mb-4 flex items-center gap-2">
-              <Target className="w-4 h-4 text-[#00d4ff]" />
-              AI Strategy Review
-            </h3>
-            <div className="bg-[#0a0e17] rounded-lg p-4 space-y-3">
-              <p className="text-sm text-[#8b92a8]">
-                <strong className="text-[#dee2f5]">Strengths:</strong> Strategy shows positive expected value with {(results.win_rate * 100).toFixed(0)}% win rate.
-                Kelly-compliant sizing protects bankroll during drawdowns.
-              </p>
-              <p className="text-sm text-[#8b92a8]">
-                <strong className="text-[#dee2f5]">Weaknesses:</strong> Max drawdown of {(results.max_drawdown * 100).toFixed(1)}% suggests position sizing could be more conservative in volatile periods.
-              </p>
-              <p className="text-sm text-[#00d4ff]">
-                <strong>Improvement:</strong> Add a volatility filter — skip trades when volume acceleration exceeds 3x to avoid crowded exits.
-              </p>
-            </div>
+          <div className="divide-y divide-[#1a2030]">
+            {history.slice(0, 5).map((h, i) => (
+              <div key={i} className="p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-[#dee2f5]">
+                    Bankroll: {formatMoney(h.initial_bankroll)}
+                  </p>
+                  <p className="text-xs text-[#8b92a8]">
+                    {new Date(h.created_at).toLocaleDateString()} · {h.results.total_trades} trades
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className={`text-sm font-bold font-mono-num ${h.results.total_return >= 0 ? "text-[#00ff88]" : "text-[#ff4757]"}`}>
+                    {h.results.total_return >= 0 ? "+" : ""}{formatPercent(h.results.total_return)}
+                  </p>
+                  <p className="text-xs text-[#8b92a8]">Sharpe: {Number(h.results.sharpe_ratio).toFixed(2)}</p>
+                </div>
+              </div>
+            ))}
           </div>
-        </>
+        </div>
       )}
     </div>
   );

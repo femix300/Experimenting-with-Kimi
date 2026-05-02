@@ -36,8 +36,15 @@ class SignalViewSet(ViewSet):
     All endpoints return the same JSON shape as before for React compatibility.
     """
 
+
+    def _get_user_id(self, request):
+        """Get the current user ID from the request."""
+        return str(request.user.username) if request.user.is_authenticated else "anonymous"
+
     # ---------- list ----------
     def list(self, request):
+        user_id = self._get_user_id(request)
+        filters.append(("user_id", "==", user_id))
         """GET /api/signals/"""
         filters = []
 
@@ -67,7 +74,7 @@ class SignalViewSet(ViewSet):
         """GET /api/signals/active/"""
         limit = int(request.query_params.get("limit", 20))
         min_edge = float(request.query_params.get("min_edge", 0))
-        signals = get_active_signals(limit=limit, min_edge=min_edge)
+        signals = get_active_signals(limit=limit, min_edge=min_edge, user_id=self._get_user_id(request))
         
         # Enrich signals with market category
         for signal in signals:
@@ -100,13 +107,46 @@ class SignalViewSet(ViewSet):
             logger.error(f"Cleanup error: {e}")
             return Response({"success": False, "error": str(e)}, status=500)
 
+
+    # ---------- clear_all ----------
+    @action(detail=False, methods=['post'])
+    def clear_all(self, request):
+        """POST /api/signals/clear_all/ — delete ALL signals from Firestore."""
+        try:
+            signals = fs.query(
+                Collection.SIGNALS,
+                filters=[("is_active", "==", True), ("user_id", "==", self._get_user_id(request))],
+                limit=500,
+            )
+            deleted = 0
+            for signal in signals:
+                signal_id = signal.get("id") or signal.get("signal_id")
+                if signal_id:
+                    fs.delete(Collection.SIGNALS, signal_id)
+                    deleted += 1
+            
+            # Also clear deactivated ones
+            all_signals = fs.query(Collection.SIGNALS, limit=500)
+            for signal in all_signals:
+                signal_id = signal.get("id") or signal.get("signal_id")
+                if signal_id:
+                    fs.delete(Collection.SIGNALS, signal_id)
+                    deleted += 1
+            
+            logger.info(f"Cleared {deleted} signals from Firestore")
+            return Response({"success": True, "deleted_count": deleted})
+        except Exception as e:
+            logger.error(f"Clear all error: {e}")
+            return Response({"success": False, "error": str(e)}, status=500)
+
     # ---------- stats ----------
     @action(detail=False, methods=['get'])
     def stats(self, request):
+        user_id = self._get_user_id(request)
         """GET /api/signals/stats/"""
         active_signals = fs.query(
             Collection.SIGNALS,
-            filters=[("is_active", "==", True)],
+            filters=[("is_active", "==", True), ("user_id", "==", user_id)],
         )
 
         stats = {

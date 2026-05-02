@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMarketStore, useSignalStore } from "@/stores";
 import { getMarkets } from "@/lib/api";
@@ -40,7 +40,15 @@ const formatTimeRemaining = (hours?: number, status?: string) => {
 const formatVolume = (vol: number) => {
   if (vol >= 1e6) return `₦${(vol / 1e6).toFixed(1)}M`;
   if (vol >= 1e3) return `₦${(vol / 1e3).toFixed(1)}K`;
-  return `₦${vol.toFixed(0)}`;
+  return `₦${Math.round(vol).toLocaleString()}`;
+};
+
+const formatPrice = (price: number) => {
+  return `₦${Number(price).toFixed(2)}`;
+};
+
+const formatProb = (prob: number) => {
+  return `${Number(prob).toFixed(1)}%`;
 };
 
 const getLiquidityLabel = (liq: number) => {
@@ -49,7 +57,7 @@ const getLiquidityLabel = (liq: number) => {
   return { label: "Thin", color: "text-[#ff4757]" };
 };
 
-const MarketCard = ({ market, onClick, hasEdge }: { market: Market; onClick: () => void; hasEdge?: boolean }) => {
+const MarketCard = memo(({ market, onClick, hasEdge }: { market: Market; onClick: () => void; hasEdge?: boolean }) => {
   const cat = CATEGORY_CONFIG.find((c) => c.key === market.category) || CATEGORY_CONFIG[4];
   const liq = getLiquidityLabel(market.liquidity);
   const prob = market.implied_probability || (market.current_price || 0) * 100;
@@ -61,7 +69,7 @@ const MarketCard = ({ market, onClick, hasEdge }: { market: Market; onClick: () 
     >
       {hasEdge && (
         <div className="absolute top-3 right-3 px-2 py-0.5 bg-[#00ff88]/10 border border-[#00ff88]/30 rounded text-xs font-bold text-[#00ff88]">
-          +{market.edge_score?.toFixed(0)}% Edge
+          +{Number(market.edge_score).toFixed(0)}% Edge
         </div>
       )}
       <div className="flex items-start justify-between mb-3">
@@ -78,11 +86,11 @@ const MarketCard = ({ market, onClick, hasEdge }: { market: Market; onClick: () 
       <div className="grid grid-cols-2 gap-2 mb-3">
         <div className="bg-[#0a0e17] rounded-lg p-2">
           <p className="text-[10px] text-[#8b92a8] uppercase">Price</p>
-          <p className="text-sm font-bold font-mono-num text-[#dee2f5]">₦{market.current_price?.toFixed(2) || "0.00"}</p>
+          <p className="text-sm font-bold font-mono-num text-[#dee2f5]">{formatPrice(market.current_price || 0)}</p>
         </div>
         <div className="bg-[#0a0e17] rounded-lg p-2">
           <p className="text-[10px] text-[#8b92a8] uppercase">Implied Prob</p>
-          <p className="text-sm font-bold font-mono-num text-[#00d4ff]">{prob.toFixed(1)}%</p>
+          <p className="text-sm font-bold font-mono-num text-[#00d4ff]">{formatProb(prob)}</p>
         </div>
       </div>
       <div className="flex items-center justify-between text-xs text-[#8b92a8]">
@@ -103,9 +111,10 @@ const MarketCard = ({ market, onClick, hasEdge }: { market: Market; onClick: () 
       </div>
     </div>
   );
-};
+});
+MarketCard.displayName = "MarketCard";
 
-const MarketRow = ({ market, onClick, hasEdge }: { market: Market; onClick: () => void; hasEdge?: boolean }) => {
+const MarketRow = memo(({ market, onClick, hasEdge }: { market: Market; onClick: () => void; hasEdge?: boolean }) => {
   const cat = CATEGORY_CONFIG.find((c) => c.key === market.category) || CATEGORY_CONFIG[4];
   const prob = market.implied_probability || (market.current_price || 0) * 100;
 
@@ -122,13 +131,13 @@ const MarketRow = ({ market, onClick, hasEdge }: { market: Market; onClick: () =
           <span className="text-sm text-[#dee2f5] line-clamp-1">{market.title}</span>
           {hasEdge && (
             <span className="px-1.5 py-0.5 bg-[#00ff88]/10 rounded text-[10px] text-[#00ff88] font-bold">
-              +{market.edge_score?.toFixed(0)}%
+              +{Number(market.edge_score).toFixed(0)}%
             </span>
           )}
         </div>
       </td>
-      <td className="py-3 px-4 text-sm font-mono-num text-[#dee2f5]">₦{market.current_price?.toFixed(2)}</td>
-      <td className="py-3 px-4 text-sm font-mono-num text-[#00d4ff]">{prob.toFixed(1)}%</td>
+      <td className="py-3 px-4 text-sm font-mono-num text-[#dee2f5]">{formatPrice(market.current_price || 0)}</td>
+      <td className="py-3 px-4 text-sm font-mono-num text-[#00d4ff]">{formatProb(prob)}</td>
       <td className="py-3 px-4 text-sm font-mono-num text-[#8b92a8]">{formatVolume(market.total_volume || 0)}</td>
       <td className="py-3 px-4 text-sm font-mono-num text-[#8b92a8]">{formatTimeRemaining(market.time_remaining_hours, market.status)}</td>
       <td className="py-3 px-4">
@@ -136,7 +145,8 @@ const MarketRow = ({ market, onClick, hasEdge }: { market: Market; onClick: () =
       </td>
     </tr>
   );
-};
+});
+MarketRow.displayName = "MarketRow";
 
 const MarketsExplorer = () => {
   const navigate = useNavigate();

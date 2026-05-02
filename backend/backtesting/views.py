@@ -16,6 +16,10 @@ class BacktestViewSet(viewsets.ViewSet):
     API endpoints for backtesting
     """
     
+    def _get_user_id(self, request):
+        """Get the current user's ID from the request."""
+        return str(request.user.username) if request.user.is_authenticated else "anonymous"
+    
     @action(detail=False, methods=['get'])
     def strategies(self, request):
         """
@@ -63,8 +67,10 @@ class BacktestViewSet(viewsets.ViewSet):
         
         GET /api/backtest/results/
         """
+        user_id = self._get_user_id(request)
         results = fs.query(
             collection=Collection.BACKTEST_RESULTS,
+            filters=[("user_id", "==", user_id)],
             order_by=("created_at", True),
             limit=20,
         )
@@ -91,6 +97,7 @@ class BacktestViewSet(viewsets.ViewSet):
         }
         """
         try:
+            user_id = self._get_user_id(request)
             strategy_config = request.data.get('strategy_config', {})
             initial_bankroll = float(request.data.get('initial_bankroll', 10000))
             
@@ -99,9 +106,10 @@ class BacktestViewSet(viewsets.ViewSet):
             
             # Save result to Firestore
             from django.utils import timezone
-            doc_id = f"backtest_{timezone.now().timestamp()}"
+            doc_id = f"backtest_{user_id}_{timezone.now().timestamp()}"
             
             backtest_doc = {
+                "user_id": user_id,
                 "strategy_config": strategy_config,
                 "initial_bankroll": initial_bankroll,
                 "results": result,
@@ -122,4 +130,3 @@ class BacktestViewSet(viewsets.ViewSet):
                 'success': False,
                 'error': str(e),
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        

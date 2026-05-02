@@ -26,8 +26,6 @@ class MarketPagination(PageNumberPagination):
 
 class MarketViewSet(viewsets.GenericViewSet):
     """
-    Firestore-backed market endpoints. No SQLite dependency.
-    
     list:      GET  /api/markets/
     retrieve:  GET  /api/markets/{firestore_doc_id}/
     scan:      POST /api/markets/scan/
@@ -36,6 +34,21 @@ class MarketViewSet(viewsets.GenericViewSet):
     price_history: GET /api/markets/price_history/
     order_book:    GET /api/markets/order_book/
     """
+    def _get_uid_from_request(self, request):
+        """Extract Firebase UID from Authorization header or request.user."""
+        if request.user.is_authenticated:
+            return str(request.user.username)
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            try:
+                from firebase_admin import auth as firebase_auth
+                token = auth_header[7:]
+                decoded = firebase_auth.verify_id_token(token, check_revoked=False)
+                return decoded.get("uid", "anonymous")
+            except:
+                pass
+        return "anonymous"
+
     pagination_class = MarketPagination
 
     # ── list ──────────────────────────────────────────────────────────
@@ -149,7 +162,7 @@ class MarketViewSet(viewsets.GenericViewSet):
             ai_result = estimate_probability(pk)
 
             # Agent 04: Signal
-            signal_doc = generate_signal(market_event_id=pk, user_bankroll=user_bankroll)
+            signal_doc = generate_signal(market_event_id=pk, user_id=self._get_uid_from_request(request), user_bankroll=user_bankroll)
 
             # Latest AI analysis
             latest_ai = fs.query(

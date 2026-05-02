@@ -1,5 +1,16 @@
-import { create } from 'zustand';
-import type { Market, Signal, Trade, UserProfile, BacktestResult, CalibrationData, AccuracyMetrics, SignalStats, QuantMetrics, AIAnalysis } from '@/types';
+import { create } from "zustand";
+import type {
+  Market,
+  Signal,
+  Trade,
+  UserProfile,
+  BacktestResult,
+  CalibrationData,
+  AccuracyMetrics,
+  SignalStats,
+  QuantMetrics,
+  AIAnalysis,
+} from "@/types";
 
 interface MarketState {
   markets: Market[];
@@ -11,7 +22,7 @@ interface MarketState {
   orderBook: { bids: Array<{ price: number; quantity: number }>; asks: Array<{ price: number; quantity: number }> } | null;
   loading: boolean;
   error: string | null;
-  viewMode: 'grid' | 'list';
+  viewMode: "grid" | "list";
   filters: {
     categories: string[];
     status: string;
@@ -29,8 +40,8 @@ interface MarketState {
   setOrderBook: (ob: { bids: Array<{ price: number; quantity: number }>; asks: Array<{ price: number; quantity: number }> } | null) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
-  setViewMode: (mode: 'grid' | 'list') => void;
-  setFilters: (filters: Partial<MarketState['filters']>) => void;
+  setViewMode: (mode: "grid" | "list") => void;
+  setFilters: (filters: Partial<MarketState["filters"]>) => void;
   applyFilters: () => void;
 }
 
@@ -44,13 +55,13 @@ export const useMarketStore = create<MarketState>((set, get) => ({
   orderBook: null,
   loading: false,
   error: null,
-  viewMode: 'grid',
+  viewMode: "grid",
   filters: {
     categories: [],
-    status: 'open',
-    sortBy: 'volume',
-    timeRange: 'all',
-    search: '',
+    status: "open",
+    sortBy: "volume",
+    timeRange: "all",
+    search: "",
     minLiquidity: false,
   },
   setMarkets: (markets) => {
@@ -88,19 +99,19 @@ export const useMarketStore = create<MarketState>((set, get) => ({
     }
 
     switch (filters.sortBy) {
-      case 'volume':
+      case "volume":
         result.sort((a, b) => b.total_volume - a.total_volume);
         break;
-      case 'edge':
+      case "edge":
         result.sort((a, b) => (b.edge_score || 0) - (a.edge_score || 0));
         break;
-      case 'time_asc':
+      case "time_asc":
         result.sort((a, b) => (a.time_remaining_hours || 9999) - (b.time_remaining_hours || 9999));
         break;
-      case 'time_desc':
+      case "time_desc":
         result.sort((a, b) => (b.time_remaining_hours || 0) - (a.time_remaining_hours || 0));
         break;
-      case 'change':
+      case "change":
         result.sort((a, b) => Math.abs(b.volume_24h || 0) - Math.abs(a.volume_24h || 0));
         break;
     }
@@ -126,9 +137,12 @@ interface SignalState {
   setError: (error: string | null) => void;
   setMinEdgeFilter: (minEdge: number) => void;
   setCategoryFilter: (category: string | null) => void;
+  cleared: boolean;
+  clearAllSignals: () => void;
 }
 
 export const useSignalStore = create<SignalState>((set) => ({
+  cleared: false,
   signals: [],
   activeSignals: [],
   selectedSignal: null,
@@ -145,6 +159,7 @@ export const useSignalStore = create<SignalState>((set) => ({
   setError: (error) => set({ error }),
   setMinEdgeFilter: (minEdgeFilter) => set({ minEdgeFilter }),
   setCategoryFilter: (categoryFilter) => set({ categoryFilter }),
+  clearAllSignals: () => set({ activeSignals: [], signals: [], selectedSignal: null }),
 }));
 
 interface PortfolioState {
@@ -170,8 +185,8 @@ export const usePortfolioStore = create<PortfolioState>((set) => ({
   loading: false,
   setProfile: (profile) => set({ profile }),
   setTrades: (trades) => {
-    const openTrades = trades.filter((t) => t.status === 'open');
-    const closedTrades = trades.filter((t) => t.status === 'won' || t.status === 'lost');
+    const openTrades = trades.filter((t) => t.status === "open");
+    const closedTrades = trades.filter((t) => t.status === "won" || t.status === "lost");
     set({ trades, openTrades, closedTrades });
   },
   setAnalytics: (analytics) => set({ analytics }),
@@ -188,9 +203,9 @@ interface BacktestState {
   history: Array<{ strategy_config: Record<string, unknown>; initial_bankroll: number; results: BacktestResult; created_at: string }>;
   loading: boolean;
   selectedStrategy: string | null;
-  setStrategies: (strategies: BacktestState['strategies']) => void;
+  setStrategies: (strategies: BacktestState["strategies"]) => void;
   setResults: (results: BacktestResult | null) => void;
-  setHistory: (history: BacktestState['history']) => void;
+  setHistory: (history: BacktestState["history"]) => void;
   setLoading: (loading: boolean) => void;
   setSelectedStrategy: (selectedStrategy: string | null) => void;
 }
@@ -228,36 +243,40 @@ export const useCalibrationStore = create<CalibrationState>((set) => ({
 
 interface AuthState {
   isAuthenticated: boolean;
-  user: { id: string; username: string; email?: string } | null;
+  user: { id: string; username: string; email?: string; displayName?: string } | null;
   token: string | null;
   onboardingComplete: boolean;
+  authLoading: boolean;
   setAuthenticated: (auth: boolean) => void;
-  setUser: (user: AuthState['user']) => void;
+  setUser: (user: AuthState["user"]) => void;
   setToken: (token: string | null) => void;
   setOnboardingComplete: (complete: boolean) => void;
+  setAuthLoading: (loading: boolean) => void;
   logout: () => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: false,
   user: null,
-  token: localStorage.getItem('edgeiq_token'),
-  onboardingComplete: localStorage.getItem('edgeiq_onboarding') === 'complete',
+  token: localStorage.getItem("edgeiq_firebase_token"),
+  onboardingComplete: localStorage.getItem("edgeiq_onboarding") === "complete",
+  authLoading: true,
   setAuthenticated: (isAuthenticated) => set({ isAuthenticated }),
   setUser: (user) => set({ user }),
   setToken: (token) => {
-    if (token) localStorage.setItem('edgeiq_token', token);
-    else localStorage.removeItem('edgeiq_token');
+    if (token) localStorage.setItem("edgeiq_firebase_token", token);
+    else localStorage.removeItem("edgeiq_firebase_token");
     set({ token });
   },
   setOnboardingComplete: (onboardingComplete) => {
-    if (onboardingComplete) localStorage.setItem('edgeiq_onboarding', 'complete');
-    else localStorage.removeItem('edgeiq_onboarding');
+    if (onboardingComplete) localStorage.setItem("edgeiq_onboarding", "complete");
+    else localStorage.removeItem("edgeiq_onboarding");
     set({ onboardingComplete });
   },
+  setAuthLoading: (authLoading) => set({ authLoading }),
   logout: () => {
-    localStorage.removeItem('edgeiq_token');
-    localStorage.removeItem('edgeiq_onboarding');
-    set({ isAuthenticated: false, user: null, token: null });
+    localStorage.removeItem("edgeiq_firebase_token");
+    localStorage.removeItem("edgeiq_onboarding");
+    set({ isAuthenticated: false, user: null, token: null, onboardingComplete: false });
   },
 }));

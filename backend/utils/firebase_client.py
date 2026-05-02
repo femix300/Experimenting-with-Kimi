@@ -120,9 +120,8 @@ def get_firestore_client() -> "firestore.Client | None":
 # Then in INSTALLED_APPS add: 'utils.apps.FirestoreConfig'
 # ---------------------------------------------------------------------------
 
-
 # ---------------------------------------------------------------------------
-# 3. Collection name constants (single source of truth)
+# 3. Collection name constants (sinle source of truth)
 # ---------------------------------------------------------------------------
 class Collection:
     MARKETS = "markets"

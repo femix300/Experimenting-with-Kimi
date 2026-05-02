@@ -1,7 +1,7 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, memo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSignalStore, useMarketStore } from "@/stores";
-import { getActiveSignals, getSignalStats, analyzeMarket } from "@/lib/api";
+import { getActiveSignals, getSignalStats, clearAllSignalsDb } from "@/lib/api";
 import {
   Zap,
   TrendingUp,
@@ -12,8 +12,11 @@ import {
   Loader2,
   Bell,
   X,
+  Trash2,
+  Tag,
 } from "lucide-react";
 import type { Signal } from "@/types";
+import { CATEGORY_COLORS, CATEGORY_LABELS } from "@/types";
 
 const TOASTS: Record<string, string> = {
   edge: "Edge: The gap between market-implied probability and AI-estimated true probability. A 25% edge means the market is undervaluing this outcome by 25 percentage points.",
@@ -23,18 +26,31 @@ const TOASTS: Record<string, string> = {
   confidence: "Confidence: How certain the AI is about its probability estimate. Higher confidence = more reliable signal.",
 };
 
-const SignalCard = ({ signal, onClick }: { signal: Signal; onClick: () => void }) => {
+const SignalCard = memo(({ signal, onClick }: { signal: Signal; onClick: () => void }) => {
   const edge = signal.edge_score;
-  const edgeColor = edge >= 20 ? "text-edge-green" : edge >= 10 ? "text-edge-amber" : "text-edge-red";
+  const edgeColor = edge >= 20 ? "text-[#00ff88]" : edge >= 10 ? "text-[#ffa502]" : "text-[#ff4757]";
   const label = signal.direction === "BUY" ? "BUY" : signal.direction === "SELL" ? "AVOID" : "WAIT";
   const labelColor = signal.direction === "BUY" ? "text-[#00ff88]" : signal.direction === "SELL" ? "text-[#ff4757]" : "text-[#ffa502]";
+  const category = (signal.category || "other") as keyof typeof CATEGORY_COLORS;
+  const catColor = CATEGORY_COLORS[category] || CATEGORY_COLORS.other;
+  const catLabel = CATEGORY_LABELS[category] || "Other";
 
   return (
     <div
       onClick={onClick}
       className="group relative bg-[#131a2b] border border-[#1a2030] rounded-xl p-5 hover:border-[#00d4ff]/30 hover:shadow-[0_0_20px_rgba(0,212,255,0.08)] transition-all cursor-pointer"
     >
-      <div className="flex items-start justify-between mb-4">
+      {/* Category Badge */}
+      <div className="absolute top-3 left-3">
+        <span
+          className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"
+          style={{ backgroundColor: `${catColor}15`, color: catColor }}
+        >
+          {catLabel}
+        </span>
+      </div>
+
+      <div className="flex items-start justify-between mb-4 pt-6">
         <div className="flex-1 min-w-0">
           <h3 className="font-semibold text-[#dee2f5] text-sm leading-snug line-clamp-2 mb-1">
             {signal.market_title}
@@ -59,13 +75,13 @@ const SignalCard = ({ signal, onClick }: { signal: Signal; onClick: () => void }
         <div className="bg-[#0a0e17] rounded-lg p-3" data-tooltip={TOASTS.ev}>
           <p className="text-[10px] uppercase text-[#8b92a8] mb-1">EV</p>
           <p className={`text-lg font-bold font-mono-num ${signal.expected_value > 0 ? "text-[#00ff88]" : "text-[#ff4757]"}`}>
-            {signal.expected_value > 0 ? "+" : ""}₦{signal.expected_value.toFixed(2)}
+            {signal.expected_value > 0 ? "+" : ""}₦{Number(signal.expected_value).toFixed(2)}
           </p>
         </div>
         <div className="bg-[#0a0e17] rounded-lg p-3" data-tooltip={TOASTS.kelly}>
           <p className="text-[10px] uppercase text-[#8b92a8] mb-1">Kelly</p>
           <p className="text-lg font-bold font-mono-num text-[#00d4ff]">
-            {signal.kelly_percentage.toFixed(1)}%
+            {Number(signal.kelly_percentage).toFixed(1)}%
           </p>
         </div>
       </div>
@@ -73,10 +89,10 @@ const SignalCard = ({ signal, onClick }: { signal: Signal; onClick: () => void }
       <div className="flex items-center justify-between text-xs">
         <div className="flex items-center gap-3">
           <span className="text-[#8b92a8]">
-            Market: <span className="text-[#dee2f5] font-mono-num">{signal.market_probability.toFixed(1)}%</span>
+            Market: <span className="text-[#dee2f5] font-mono-num">{Number(signal.market_probability).toFixed(1)}%</span>
           </span>
           <span className="text-[#8b92a8]">
-            AI: <span className="text-[#00d4ff] font-mono-num">{signal.ai_probability.toFixed(1)}%</span>
+            AI: <span className="text-[#00d4ff] font-mono-num">{Number(signal.ai_probability).toFixed(1)}%</span>
           </span>
         </div>
         <div className="flex items-center gap-1 text-[#00d4ff]">
@@ -95,26 +111,41 @@ const SignalCard = ({ signal, onClick }: { signal: Signal; onClick: () => void }
             ) : (
               <Minus className="w-3 h-3 text-[#8b92a8]" />
             )}
-            <span className="text-[#8b92a8]">Mo: {signal.quant_snapshot.momentum_score?.toFixed(1)}</span>
+            <span className="text-[#8b92a8]">Mo: {Number(signal.quant_snapshot.momentum_score).toFixed(1)}</span>
           </div>
           <div className="flex items-center gap-1" data-tooltip={TOASTS.confidence}>
             <span className="text-[#8b92a8]">Conf: {signal.confidence}%</span>
           </div>
         </div>
       )}
+
+      {/* Full AI Reasoning */}
+      {signal.reasoning && (
+        <div className="mt-3 pt-3 border-t border-[#1a2030]">
+          <p className="text-xs text-[#8b92a8] mb-1 flex items-center gap-1">
+            <Tag className="w-3 h-3" /> AI Reasoning
+          </p>
+          <p className="text-xs text-[#5a6070] leading-relaxed line-clamp-3">{signal.reasoning}</p>
+        </div>
+      )}
     </div>
   );
-};
+});
+SignalCard.displayName = "SignalCard";
 
 const SignalFeed = () => {
   const navigate = useNavigate();
-  const { activeSignals, loading, error, minEdgeFilter, categoryFilter, setActiveSignals, setLoading, setError, setMinEdgeFilter, setCategoryFilter } = useSignalStore();
+  const { activeSignals, loading, error, minEdgeFilter, categoryFilter, setActiveSignals, setLoading, setError, setMinEdgeFilter, setCategoryFilter, clearAllSignals, cleared } = useSignalStore();
+  const clearedRef = useRef(cleared);
+  useEffect(() => { clearedRef.current = cleared; }, [cleared]);
   const { setSelectedMarket, setQuantMetrics, setAiAnalysis } = useMarketStore();
   const [stats, setStats] = useState<{ total_active: number; by_direction: Record<string, number>; by_strength: Record<string, number>; edge_stats?: { avg_edge: number; max_edge: number; min_edge: number }; confidence_stats?: { avg_confidence: number; max_confidence: number; min_confidence: number } } | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "info" } | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
   const fetchSignals = useCallback(async () => {
+    if (clearedRef.current) return;
+    useSignalStore.setState({ cleared: false });
     setLoading(true);
     setError(null);
     try {
@@ -130,7 +161,7 @@ const SignalFeed = () => {
         setActiveSignals(signals);
         const highEdge = signals.find((s) => s.edge_score > 20);
         if (highEdge) {
-          setToast({ message: `High-edge signal: ${highEdge.market_title.slice(0, 30)}... (+${highEdge.edge_score.toFixed(0)}%)`, type: "success" });
+          setToast({ message: `High-edge signal: ${highEdge.market_title.slice(0, 30)}... (+${Number(highEdge.edge_score).toFixed(0)}%)`, type: "success" });
           setTimeout(() => setToast(null), 5000);
         }
       }
@@ -144,15 +175,16 @@ const SignalFeed = () => {
   }, [minEdgeFilter, categoryFilter, setActiveSignals, setLoading, setError]);
 
   useEffect(() => {
+    if (cleared) return;
     fetchSignals();
     const interval = setInterval(fetchSignals, 60000);
     return () => clearInterval(interval);
   }, [fetchSignals]);
 
-  const handleSignalClick = async (signal: Signal) => {
+  const handleSignalClick = (signal: Signal) => {
     const marketId = signal.market_event_id || signal.market_id;
     
-    // Pre-populate basic market data
+    // Pre-populate basic market data from the signal
     setSelectedMarket({
       title: signal.market_title,
       bayse_event_id: marketId,
@@ -160,6 +192,7 @@ const SignalFeed = () => {
       implied_probability: signal.market_probability,
       category: signal.category || "other",
     } as any);
+    
     setQuantMetrics({
       momentum_score: signal.quant_snapshot?.momentum_score || 0,
       momentum_direction: signal.quant_snapshot?.momentum_direction || "neutral",
@@ -168,17 +201,28 @@ const SignalFeed = () => {
       bid_ask_spread: 0,
     } as any);
     
-    // Fetch full AI analysis with reasoning
-    try {
-      const result = await analyzeMarket(marketId, 10000);
-      if (result.success) {
-        setAiAnalysis(result.ai_analysis);
-        if (result.market) setSelectedMarket(result.market as any);
-      }
-    } catch {}
+    setAiAnalysis({
+      market_id: marketId,
+      market_title: signal.market_title,
+      probability: signal.ai_probability,
+      confidence: signal.confidence,
+      reasoning: signal.reasoning || "",
+      sources: "",
+      model_used: signal.model_used || "gemini-1.5-flash",
+      search_grounding_used: true,
+      analyzed_at: signal.created_at,
+    } as any);
     
     sessionStorage.setItem("fromSignal", "true");
     navigate(`/market/${marketId}`);
+  };
+
+  const handleClearAll = () => {
+    clearAllSignalsDb().then(() => clearAllSignals());
+    setStats(null);
+    setToast(null);
+    setToast({ message: "All signals cleared", type: "info" });
+    setTimeout(() => setToast(null), 3000);
   };
 
   const categories = ["crypto", "sports", "politics", "entertainment", "other"];
@@ -197,6 +241,15 @@ const SignalFeed = () => {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {activeSignals.length > 0 && (
+            <button
+              onClick={handleClearAll}
+              className="flex items-center gap-2 px-4 py-2 bg-[#ff4757]/10 text-[#ff4757] rounded-lg text-sm font-medium hover:bg-[#ff4757]/20 transition-all border border-[#ff4757]/30"
+            >
+              <Trash2 className="w-4 h-4" />
+              Clear All
+            </button>
+          )}
           <button
             onClick={fetchSignals}
             disabled={loading}
@@ -237,7 +290,7 @@ const SignalFeed = () => {
           <div className="bg-[#131a2b] rounded-lg p-4 border border-[#1a2030]">
             <p className="text-xs text-[#8b92a8] uppercase">Avg Edge</p>
             <p className="text-2xl font-bold text-[#ffa502] font-mono-num">
-              {stats.edge_stats?.avg_edge?.toFixed(1) || 0}%
+              {Number(stats.edge_stats?.avg_edge || 0).toFixed(1)}%
             </p>
           </div>
         </div>

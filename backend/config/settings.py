@@ -69,6 +69,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "auth_app.firebase_auth.FirebaseTokenMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -235,3 +236,6 @@ AUTHENTICATION_BACKENDS = [
 
 # CORS - Allow React frontend
 CORS_ALLOW_ALL_ORIGINS = True  # Tighten this in production
+CSRF_TRUSTED_ORIGINS = ["http://localhost:3000", "http://localhost:8000", "http://127.0.0.1:3000", "http://127.0.0.1:8000"]
+CSRF_COOKIE_SECURE = False
+CSRF_COOKIE_HTTPONLY = False

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, memo } from "react";
 import { usePortfolioStore } from "@/stores";
 import { getProfile, getTrades, getAnalytics, getQPI } from "@/lib/api";
 import {
@@ -16,6 +16,14 @@ import {
 
 const COLORS = ["#00ff88", "#ff4757"];
 
+const StatCard = memo(({ label, value, color = "text-[#dee2f5]" }: { label: string; value: string; color?: string }) => (
+  <div className="bg-[#131a2b] rounded-lg p-4 border border-[#1a2030]">
+    <p className="text-xs text-[#8b92a8] uppercase mb-1">{label}</p>
+    <p className={`text-xl font-bold font-mono-num ${color}`}>{value}</p>
+  </div>
+));
+StatCard.displayName = "StatCard";
+
 const Portfolio = () => {
   const { profile, openTrades, closedTrades, analytics, setProfile, setTrades, setAnalytics } = usePortfolioStore();
   const [loading, setLoading] = useState(true);
@@ -29,12 +37,10 @@ const Portfolio = () => {
           getProfile(),
           getTrades(),
           getAnalytics(),
-          
         ]);
         if (profileRes.success) setProfile(profileRes.profile);
         if (tradesRes.success) setTrades(tradesRes.trades);
         if (analyticsRes.success) setAnalytics(analyticsRes.analytics);
-        // QPI fetched separately below
       } catch { /* ignore */ }
       getQPI().then(res => { if (res?.success) setQpi(res.qpi); }).catch(() => {});
       setLoading(false);
@@ -44,12 +50,12 @@ const Portfolio = () => {
 
   const pnlData = closedTrades.map((_t, i) => ({
     trade: i + 1,
-    cumulative: closedTrades.slice(0, i + 1).reduce((sum, tr) => sum + (tr.pnl || 0), 0),
+    cumulative: Number(closedTrades.slice(0, i + 1).reduce((sum, tr) => sum + (tr.pnl || 0), 0).toFixed(2)),
   }));
 
   const winLossData = [
     { name: "Wins", value: analytics?.winning_trades || 0 },
-    { name: "Losses", value: (analytics?.total_trades || 0) - (analytics?.winning_trades || 0) },
+    { name: "Losses", value: Math.max(0, (analytics?.total_trades || 0) - (analytics?.winning_trades || 0)) },
   ];
 
   const qpiScore = qpi?.score ?? Math.min(100, Math.round(
@@ -57,6 +63,12 @@ const Portfolio = () => {
     (Math.max(0, analytics?.sharpe_ratio || 0) * 20) * 0.3 +
     (closedTrades.filter((t) => t.kelly_compliant).length / Math.max(1, closedTrades.length) * 100) * 0.3)
   ));
+
+  const bankrollFormatted = `₦${(profile?.bankroll || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const totalPnl = analytics?.total_pnl || 0;
+  const totalPnlFormatted = `${totalPnl >= 0 ? "+" : ""}₦${Math.abs(totalPnl).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const winRateFormatted = `${Number(analytics?.win_rate || 0).toFixed(1)}%`;
+  const sharpeFormatted = analytics?.sharpe_ratio ? Number(analytics.sharpe_ratio).toFixed(2) : "N/A";
 
   if (loading) {
     return (
@@ -78,24 +90,14 @@ const Portfolio = () => {
 
       {/* Hero Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="bg-[#131a2b] rounded-lg p-4 border border-[#1a2030]">
-          <p className="text-xs text-[#8b92a8] uppercase mb-1">Bankroll</p>
-          <p className="text-xl font-bold font-mono-num text-[#dee2f5]">₦{(profile?.bankroll || 0).toLocaleString()}</p>
-        </div>
-        <div className="bg-[#131a2b] rounded-lg p-4 border border-[#1a2030]">
-          <p className="text-xs text-[#8b92a8] uppercase mb-1">Total PnL</p>
-          <p className={`text-xl font-bold font-mono-num ${(analytics?.total_pnl || 0) >= 0 ? "text-[#00ff88]" : "text-[#ff4757]"}`}>
-            {(analytics?.total_pnl || 0) >= 0 ? "+" : ""}₦{(analytics?.total_pnl || 0).toLocaleString()}
-          </p>
-        </div>
-        <div className="bg-[#131a2b] rounded-lg p-4 border border-[#1a2030]">
-          <p className="text-xs text-[#8b92a8] uppercase mb-1">Win Rate</p>
-          <p className="text-xl font-bold font-mono-num text-[#00d4ff]">{analytics?.win_rate?.toFixed(1) || 0}%</p>
-        </div>
-        <div className="bg-[#131a2b] rounded-lg p-4 border border-[#1a2030]">
-          <p className="text-xs text-[#8b92a8] uppercase mb-1">Sharpe Ratio</p>
-          <p className="text-xl font-bold font-mono-num text-[#ffa502]">{analytics?.sharpe_ratio?.toFixed(2) || "N/A"}</p>
-        </div>
+        <StatCard label="Bankroll" value={bankrollFormatted} />
+        <StatCard
+          label="Total PnL"
+          value={totalPnlFormatted}
+          color={totalPnl >= 0 ? "text-[#00ff88]" : "text-[#ff4757]"}
+        />
+        <StatCard label="Win Rate" value={winRateFormatted} color="text-[#00d4ff]" />
+        <StatCard label="Sharpe Ratio" value={sharpeFormatted} color="text-[#ffa502]" />
       </div>
 
       {/* QPI Score */}
@@ -166,8 +168,11 @@ const Portfolio = () => {
                 <LineChart data={pnlData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1a2030" />
                   <XAxis dataKey="trade" stroke="#5a6070" fontSize={11} />
-                  <YAxis stroke="#5a6070" fontSize={11} />
-                  <Tooltip contentStyle={{ backgroundColor: "#131a2b", border: "1px solid #1a2030", borderRadius: 8 }} />
+                  <YAxis stroke="#5a6070" fontSize={11} tickFormatter={(v) => `₦${Number(v).toFixed(0)}`} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: "#131a2b", border: "1px solid #1a2030", borderRadius: 8 }}
+                    formatter={(value: number) => [`₦${Number(value).toFixed(2)}`, "Cumulative PnL"]}
+                  />
                   <Line type="monotone" dataKey="cumulative" stroke="#00d4ff" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
@@ -219,7 +224,7 @@ const Portfolio = () => {
                 <div>
                   <p className="text-sm font-medium text-[#dee2f5]">{trade.market_title}</p>
                   <p className="text-xs text-[#8b92a8]">
-                    {trade.direction} · ₦{trade.stake_amount.toLocaleString()} · Entry: ₦{trade.entry_price}
+                    {trade.direction} · ₦{Number(trade.stake_amount).toLocaleString("en-US", { minimumFractionDigits: 2 })} · Entry: ₦{Number(trade.entry_price).toFixed(2)}
                   </p>
                 </div>
                 <div className="text-right">
@@ -242,7 +247,7 @@ const Portfolio = () => {
         </h3>
         <div className="bg-[#0a0e17] rounded-lg p-4">
           <p className="text-sm text-[#8b92a8] leading-relaxed">
-            Your last {analytics?.total_trades || 0} trades show a {analytics?.win_rate?.toFixed(0) || 0}% win rate
+            Your last {analytics?.total_trades || 0} trades show a {Number(analytics?.win_rate || 0).toFixed(0)}% win rate
             with {analytics?.total_pnl && analytics.total_pnl > 0 ? "positive" : analytics?.total_pnl && analytics.total_pnl < 0 ? "negative" : "no closed"} total PnL.
             {closedTrades.filter((t) => !t.kelly_compliant).length > 0
               ? ` You over-staked ${closedTrades.filter((t) => !t.kelly_compliant).length} times — Kelly discipline is your biggest improvement area.`

@@ -9,6 +9,7 @@ import {
   Tag,
   Save,
   Info,
+  User,
 } from "lucide-react";
 
 const TOOLTIPS: Record<string, string> = {
@@ -35,20 +36,18 @@ const CATEGORIES = [
 
 const Settings = () => {
   const { profile, updateProfile } = usePortfolioStore();
-  const { logout } = useAuthStore();
+  const { user } = useAuthStore();
   const [bankroll, setBankroll] = useState(profile?.bankroll || 0);
   const [risk, setRisk] = useState<"conservative" | "balanced" | "aggressive">(profile?.risk_tolerance || "balanced");
   const [tracked, setTracked] = useState<string[]>(profile?.tracked_categories || ["crypto", "sports"]);
-  // Sync bankroll when profile loads
+
   useEffect(() => {
     if (profile?.bankroll) setBankroll(Math.round(profile.bankroll * 100) / 100);
     if (profile?.risk_tolerance) setRisk(profile.risk_tolerance);
     if (profile?.tracked_categories) setTracked(profile.tracked_categories);
   }, [profile]);
-  // Fetch profile on mount
 
   useEffect(() => {
-
     getProfile().then(res => {
       if (res.success && res.profile) {
         setBankroll(Math.round((res.profile.bankroll || 0) * 100) / 100);
@@ -57,8 +56,8 @@ const Settings = () => {
         updateProfile(res.profile);
       }
     }).catch(() => {});
-
   }, []);
+
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -85,6 +84,19 @@ const Settings = () => {
           Settings
         </h1>
         <p className="text-sm text-[#8b92a8] mt-1">Configure your EdgeIQ preferences</p>
+      </div>
+
+      {/* User Info */}
+      <div className="bg-[#131a2b] rounded-xl border border-[#1a2030] p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-full bg-[#00d4ff]/10 border border-[#00d4ff]/30 flex items-center justify-center">
+            <User className="w-5 h-5 text-[#00d4ff]" />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-[#dee2f5]">{user?.displayName || user?.username || "Trader"}</p>
+            <p className="text-xs text-[#8b92a8]">{user?.email || ""}</p>
+          </div>
+        </div>
       </div>
 
       {/* Bankroll */}
@@ -186,16 +198,7 @@ const Settings = () => {
         )}
       </div>
 
-      {/* Sign Out */}
-      <div className="pt-6 border-t border-[#1a2030]">
-        <button
-          onClick={logout}
-          className="text-sm text-[#ff4757] hover:underline"
-        >
-          Sign Out
-        </button>
       </div>
-    </div>
   );
 };
 
