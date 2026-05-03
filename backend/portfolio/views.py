@@ -50,7 +50,7 @@ class PortfolioViewSet(ViewSet):
     
     def _get_user_id(self, request):
         """Get the current user's ID from the request."""
-        return str(request.user.username)
+        return str(request.user.username) if request.user.is_authenticated else None
     
     # ---------- profile ----------
     @action(detail=False, methods=['get'])

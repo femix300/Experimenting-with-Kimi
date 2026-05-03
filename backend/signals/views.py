@@ -43,10 +43,9 @@ class SignalViewSet(ViewSet):
 
     # ---------- list ----------
     def list(self, request):
-        user_id = self._get_user_id(request)
-        filters.append(("user_id", "==", user_id))
         """GET /api/signals/"""
-        filters = []
+        user_id = self._get_user_id(request)
+        filters = [("user_id", "==", user_id)]  # Initialize here
 
         is_active = request.query_params.get('is_active', 'true')
         if is_active.lower() == 'true':
@@ -70,6 +69,7 @@ class SignalViewSet(ViewSet):
             order_by=("edge_score", True),
             limit=50,
         )
+        return Response({"success": True, "count": len(results), "signals": results})
     def active(self, request):
         """GET /api/signals/active/"""
         limit = int(request.query_params.get("limit", 20))
