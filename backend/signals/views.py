@@ -38,10 +38,21 @@ class SignalViewSet(ViewSet):
 
 
     def _get_user_id(self, request):
-        """Get the current user ID from the request."""
-        return str(request.user.username) if request.user.is_authenticated else "anonymous"
+        if request.user.is_authenticated:
+            return str(request.user.username)
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            try:
+                from firebase_admin import auth as firebase_auth
+                token = auth_header[7:]
+                decoded = firebase_auth.verify_id_token(token, check_revoked=False)
+                uid = decoded.get("uid")
+                if uid:
+                    return uid
+            except Exception:
+                pass
+        return None
 
-    # ---------- list ----------
     def list(self, request):
         """GET /api/signals/"""
         user_id = self._get_user_id(request)

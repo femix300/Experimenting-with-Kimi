@@ -12,4 +12,6 @@ urlpatterns = [
     path('simulate_trade/', PortfolioViewSet.as_view({'post': 'simulate_trade'})),
     path('close_trade/', PortfolioViewSet.as_view({'post': 'close_trade'})),
     path('analytics/', PortfolioViewSet.as_view({'get': 'analytics'})),
+    path('qpi/', PortfolioViewSet.as_view({'get': 'qpi'})),
+    path('qpi/', PortfolioViewSet.as_view({'get': 'qpi'})),
 ]

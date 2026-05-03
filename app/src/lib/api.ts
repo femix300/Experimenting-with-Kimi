@@ -21,7 +21,7 @@ import type {
 } from "@/types";
 import { getAuthToken, setAuthToken, auth } from "@/lib/firebase";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
+const API_BASE = import.meta.env.VITE_API_URL || "https://edgeiq-backend-981082317040.us-central1.run.app/api";
 
 // Recursively convert string numbers to actual numbers in API responses
 function parseNumbers(obj: any): any {

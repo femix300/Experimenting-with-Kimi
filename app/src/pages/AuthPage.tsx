@@ -93,16 +93,12 @@ const AuthPage = () => {
       // Check if user has profile / bankroll set
       try {
         const profileRes = await getProfile();
-        if (profileRes.success && profileRes.profile && profileRes.profile.bankroll > 0) {
+        if (profileRes.success && profileRes.profile) {
           setProfile(profileRes.profile);
-          setOnboardingComplete(true);
-          navigate("/markets");
-        } else {
-          navigate("/onboarding");
         }
-      } catch {
-        navigate("/onboarding");
-      }
+      } catch { /* ignore */ }
+      setOnboardingComplete(true);
+      navigate("/markets");
     } catch (err: any) {
       const msg = err?.message || "Authentication failed";
       if (msg.includes("user-not-found") || msg.includes("invalid-credential")) {

@@ -163,7 +163,6 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.TokenAuthentication',
-        'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.AllowAny',  # Public access (Firebase auth via middleware)
@@ -243,7 +242,13 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 # CORS - Allow React frontend
-CORS_ALLOW_ALL_ORIGINS = True  # Tighten this in production
+CORS_ALLOW_ALL_ORIGINS = True
+CSRF_TRUSTED_ORIGINS = [
+    'https://edgeiq-frontend-enccd3ywba-uc.a.run.app',
+    'https://edgeiq-backend-981082317040.us-central1.run.app',
+    'http://localhost:3000',
+    'http://localhost:5173',
+]  # Tighten this in production
 CSRF_TRUSTED_ORIGINS = ["http://localhost:3000", "http://localhost:8000", "http://127.0.0.1:3000", "http://127.0.0.1:8000"]
 CSRF_COOKIE_SECURE = False
 CSRF_COOKIE_HTTPONLY = False

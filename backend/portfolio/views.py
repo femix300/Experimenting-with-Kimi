@@ -49,11 +49,21 @@ class PortfolioViewSet(ViewSet):
     #permission_classes = [IsAuthenticated]
     
     def _get_user_id(self, request):
-        """Get the current user's ID from the request."""
-        return str(request.user.username) if request.user.is_authenticated else None
-    
-    # ---------- profile ----------
-    @action(detail=False, methods=['get'])
+        if request.user.is_authenticated:
+            return str(request.user.username)
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            try:
+                from firebase_admin import auth as firebase_auth
+                token = auth_header[7:]
+                decoded = firebase_auth.verify_id_token(token, check_revoked=False)
+                uid = decoded.get("uid")
+                if uid:
+                    return uid
+            except Exception:
+                pass
+        return None
+
     def profile(self, request):
         """GET /api/portfolio/profile/"""
         user_id = self._get_user_id(request)
@@ -80,7 +90,9 @@ class PortfolioViewSet(ViewSet):
         """POST /api/portfolio/update_profile/"""
         try:
             user_id = self._get_user_id(request)
-            profile = _get_or_create_profile(user_id, request.user.username)
+            if not user_id:
+                return Response({"success": False, "error": "Authentication required"}, status=401)
+            profile = _get_or_create_profile(user_id, getattr(request.user, 'username', user_id))
             updates = {"updated_at": timezone.now()}
 
             if 'bankroll' in request.data:
@@ -284,6 +296,58 @@ class PortfolioViewSet(ViewSet):
 
     # ---------- analytics ----------
     @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['get'])
+    def qpi(self, request):
+        """GET /api/portfolio/qpi/"""
+        user_id = self._get_user_id(request)
+        if not user_id:
+            return Response({"success": False, "error": "Authentication required"}, status=401)
+
+        trades = fs.query(Collection.TRADES, filters=[("user_id", "==", user_id)], limit=1000)
+        closed = [t for t in trades if t.get('status') in ('won', 'lost')]
+
+        if not closed:
+            return Response({"success": True, "qpi": {
+                "score": 0, "trend": "stable", "version": 1,
+                "calculated_at": timezone.now().isoformat(),
+                "components": {"win_rate": 0, "ev_accuracy": 50, "kelly_compliance": 0}
+            }})
+
+        wins = len([t for t in closed if t.get('status') == 'won'])
+        win_rate = (wins / len(closed)) * 100
+
+        compliant = len([t for t in closed if t.get('kelly_compliant')])
+        kelly = (compliant / len(closed)) * 100
+
+        ev_accuracies = []
+        for t in closed:
+            ev = float(t.get('expected_value', 0))
+            pnl = float(t.get('pnl', 0))
+            if ev != 0:
+                ev_accuracies.append(max(0, 100 - abs((pnl - ev) / ev * 100)))
+        ev_accuracy = sum(ev_accuracies) / len(ev_accuracies) if ev_accuracies else 50
+
+        score = (win_rate * 0.4) + (ev_accuracy * 0.3) + (kelly * 0.3)
+
+        if len(closed) >= 10:
+            recent_wr = len([t for t in closed[-5:] if t.get('status') == 'won']) / 5 * 100
+            prev_wr = len([t for t in closed[-10:-5] if t.get('status') == 'won']) / 5 * 100
+            trend = "up" if recent_wr > prev_wr else "down" if recent_wr < prev_wr else "stable"
+        else:
+            trend = "stable"
+
+        return Response({"success": True, "qpi": {
+            "score": round(score, 1),
+            "trend": trend,
+            "version": 1,
+            "calculated_at": timezone.now().isoformat(),
+            "components": {
+                "win_rate": round(win_rate, 1),
+                "ev_accuracy": round(ev_accuracy, 1),
+                "kelly_compliance": round(kelly, 1),
+            }
+        }})
+
     def analytics(self, request):
         """GET /api/portfolio/analytics/"""
         try:

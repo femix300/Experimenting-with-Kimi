@@ -60,15 +60,19 @@ const Settings = () => {
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const handleSave = async () => {
     setSaving(true);
+    setSaveError(null);
     try {
       await apiUpdateProfile({ bankroll, risk_tolerance: risk, tracked_categories: tracked });
       updateProfile({ bankroll, risk_tolerance: risk, tracked_categories: tracked });
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
-    } catch { /* ignore */ }
+    } catch (err: unknown) {
+      setSaveError(err instanceof Error ? err.message : "Failed to save settings");
+    }
     setSaving(false);
   };
 
@@ -195,6 +199,9 @@ const Settings = () => {
         </button>
         {saved && (
           <span className="text-sm text-[#00ff88]">Settings saved successfully!</span>
+        )}
+        {saveError && (
+          <span className="text-sm text-red-400">{saveError}</span>
         )}
       </div>
 

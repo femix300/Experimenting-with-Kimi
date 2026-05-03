@@ -17,10 +17,21 @@ class BacktestViewSet(viewsets.ViewSet):
     """
     
     def _get_user_id(self, request):
-        """Get the current user's ID from the request."""
-        return str(request.user.username) if request.user.is_authenticated else "anonymous"
-    
-    @action(detail=False, methods=['get'])
+        if request.user.is_authenticated:
+            return str(request.user.username)
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            try:
+                from firebase_admin import auth as firebase_auth
+                token = auth_header[7:]
+                decoded = firebase_auth.verify_id_token(token, check_revoked=False)
+                uid = decoded.get("uid")
+                if uid:
+                    return uid
+            except Exception:
+                pass
+        return None
+
     def strategies(self, request):
         """
         Get predefined backtest strategies
