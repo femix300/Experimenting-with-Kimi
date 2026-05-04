@@ -89,6 +89,10 @@ export const useMarketStore = create<MarketState>((set, get) => ({
       result = result.filter((m) => filters.categories.includes(m.category));
     }
 
+    if (filters.status) {
+      result = result.filter((m) => m.status === filters.status);
+    }
+
     if (filters.search) {
       const q = filters.search.toLowerCase();
       result = result.filter((m) => m.title.toLowerCase().includes(q));

@@ -54,12 +54,25 @@ def scan_markets(status='open', min_volume=0, min_liquidity=0, max_results=20):
         logger.info(f"  Status: {status} | Min Volume: {min_volume} | Min Liquidity: {min_liquidity}")
         logger.info("=" * 70)
 
-        response = bayse_client.get_all_events(status=status, size=50)
-        if not response:
-            logger.warning("No data returned from Bayse API")
-            return []
-
-        events = response.get('events', [])
+        # Fetch all pages from Bayse API
+        all_events = []
+        page = 1
+        while True:
+            response = bayse_client.get_all_events(status=status, size=20, page=page)
+            if not response:
+                break
+            events_page = response.get('events', [])
+            if not events_page:
+                break
+            all_events.extend(events_page)
+            pagination = response.get('pagination', {})
+            last_page = pagination.get('lastPage', 1)
+            logger.info(f"Fetched page {page}/{last_page} ({len(events_page)} events)")
+            if page >= last_page or len(all_events) >= max_results:
+                break
+            page += 1
+        
+        events = all_events[:max_results]
         if not events:
             logger.warning("Events array is empty")
             return []

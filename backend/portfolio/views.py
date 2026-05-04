@@ -187,12 +187,13 @@ class PortfolioViewSet(ViewSet):
                 "market_title": signal.get("market_title", ""),
                 "direction": signal.get("direction", "BUY"),
                 "stake_amount": float(stake_amount.quantize(Decimal("0.01"))),
-                "entry_price": signal.get("current_price") or signal.get("market_probability", 0),
+                "entry_price": signal.get("current_price") or (signal.get("market_probability", 0) / 100),
                 "exit_price": None,
                 "pnl": None,
                 "roi": None,
                 "recommended_stake": float(recommended.quantize(Decimal("0.01"))),
                 "kelly_compliant": kelly_compliant,
+                "expected_value": float(signal.get("expected_value", 0)),
                 "status": "open",
                 "opened_at": timezone.now(),
                 "closed_at": None,
@@ -321,10 +322,18 @@ class PortfolioViewSet(ViewSet):
 
         ev_accuracies = []
         for t in closed:
-            ev = float(t.get('expected_value', 0))
-            pnl = float(t.get('pnl', 0))
-            if ev != 0:
-                ev_accuracies.append(max(0, 100 - abs((pnl - ev) / ev * 100)))
+            ev_per_unit = float(t.get('expected_value', 0) or 0)
+            pnl = float(t.get('pnl', 0) or 0)
+            if ev_per_unit != 0:
+                # EV accuracy: did the outcome match the direction the AI predicted?
+                # Positive EV + win = 100%, Positive EV + loss = 0%
+                # Scaled by how confident EV was
+                ev_positive = ev_per_unit > 0
+                trade_won = pnl > 0
+                if ev_positive == trade_won:
+                    ev_accuracies.append(100)
+                else:
+                    ev_accuracies.append(0)
         ev_accuracy = sum(ev_accuracies) / len(ev_accuracies) if ev_accuracies else 50
 
         score = (win_rate * 0.4) + (ev_accuracy * 0.3) + (kelly * 0.3)

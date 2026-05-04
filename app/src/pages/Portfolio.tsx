@@ -1,6 +1,6 @@
-import { useEffect, useState, memo } from "react";
+import { useEffect, useState, memo, useCallback } from "react";
 import { usePortfolioStore } from "@/stores";
-import { getProfile, getTrades, getAnalytics, getQPI } from "@/lib/api";
+import { getProfile, getTrades, getAnalytics, getQPI, closeTrade } from "@/lib/api";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
@@ -12,6 +12,8 @@ import {
   Award,
   Activity,
   BarChart3,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 
 const COLORS = ["#00ff88", "#ff4757"];
@@ -28,6 +30,8 @@ const Portfolio = () => {
   const { profile, openTrades, closedTrades, analytics, setProfile, setTrades, setAnalytics } = usePortfolioStore();
   const [loading, setLoading] = useState(true);
   const [qpi, setQpi] = useState<{ score: number; trend: string; components: Record<string, number> } | null>(null);
+  const [resolvingTrade, setResolvingTrade] = useState<{ id: string; outcome: "YES" | "NO" } | null>(null);
+  const [resolveToast, setResolveToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   useEffect(() => {
     const fetch = async () => {
@@ -47,6 +51,30 @@ const Portfolio = () => {
     };
     fetch();
   }, []);
+
+  const handleResolve = useCallback(async (tradeId: string, outcome: "YES" | "NO") => {
+    setResolvingTrade({ id: tradeId, outcome });
+    try {
+      const exitPrice = outcome === "YES" ? 1.0 : 0.0;
+      const res = await closeTrade(tradeId, exitPrice);
+      if (res.success) {
+        setResolveToast({ message: `Trade resolved as ${outcome === "YES" ? "WIN 🎉" : "LOSS"}`, type: outcome === "YES" ? "success" : "error" });
+        // Refresh portfolio data
+        const [profileRes, tradesRes, analyticsRes] = await Promise.all([getProfile(), getTrades(), getAnalytics()]);
+        if (profileRes.success) setProfile(profileRes.profile);
+        if (tradesRes.success) setTrades(tradesRes.trades);
+        if (analyticsRes.success) setAnalytics(analyticsRes.analytics);
+        getQPI().then(r => { if (r?.success) setQpi(r.qpi); }).catch(() => {});
+      } else {
+        setResolveToast({ message: "Failed to resolve trade", type: "error" });
+      }
+    } catch {
+      setResolveToast({ message: "Failed to resolve trade", type: "error" });
+    } finally {
+      setResolvingTrade(null);
+      setTimeout(() => setResolveToast(null), 4000);
+    }
+  }, [setProfile, setTrades, setAnalytics]);
 
   const pnlData = closedTrades.map((_t, i) => ({
     trade: i + 1,
@@ -80,6 +108,13 @@ const Portfolio = () => {
 
   return (
     <div className="space-y-6">
+      {/* Resolve Toast */}
+      {resolveToast && (
+        <div className={`fixed bottom-6 right-6 z-[9999] flex items-center gap-3 px-5 py-4 rounded-xl shadow-2xl border ${resolveToast.type === "success" ? "bg-[#0a2e1a] border-[#00ff88]/30 text-[#00ff88]" : "bg-[#2e0a0a] border-[#ff4757]/30 text-[#ff4757]"}`}>
+          {resolveToast.type === "success" ? <CheckCircle2 className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
+          <span className="text-sm text-[#dee2f5]">{resolveToast.message}</span>
+        </div>
+      )}
       <div>
         <h1 className="text-2xl font-bold text-[#dee2f5] flex items-center gap-2">
           <Wallet className="w-6 h-6 text-[#00d4ff]" />
@@ -220,18 +255,34 @@ const Portfolio = () => {
           </div>
           <div className="divide-y divide-[#1a2030]">
             {openTrades.map((trade) => (
-              <div key={trade.id} className="p-4 flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-[#dee2f5]">{trade.market_title}</p>
-                  <p className="text-xs text-[#8b92a8]">
+              <div key={trade.id} className="p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-[#dee2f5] truncate">{trade.market_title}</p>
+                  <p className="text-xs text-[#8b92a8] mt-0.5">
                     {trade.direction} · ₦{Number(trade.stake_amount).toLocaleString("en-US", { minimumFractionDigits: 2 })} · Entry: ₦{Number(trade.entry_price).toFixed(2)}
                   </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-[#8b92a8]">Kelly Compliant</p>
-                  <p className={`text-sm font-bold ${trade.kelly_compliant ? "text-[#00ff88]" : "text-[#ff4757]"}`}>
-                    {trade.kelly_compliant ? "Yes" : "No"}
+                  <p className={`text-xs mt-0.5 ${trade.kelly_compliant ? "text-[#00ff88]" : "text-[#ff4757]"}`}>
+                    Kelly {trade.kelly_compliant ? "Compliant ✓" : "Non-Compliant"}
                   </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <p className="text-xs text-[#8b92a8] mr-1">Outcome:</p>
+                  <button
+                    onClick={() => handleResolve(trade.id, "YES")}
+                    disabled={resolvingTrade?.id === trade.id}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/30 rounded-lg text-xs font-bold hover:bg-[#00ff88]/20 transition-all disabled:opacity-50"
+                  >
+                    {resolvingTrade?.id === trade.id && resolvingTrade?.outcome === "YES" ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
+                    YES
+                  </button>
+                  <button
+                    onClick={() => handleResolve(trade.id, "NO")}
+                    disabled={resolvingTrade?.id === trade.id}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[#ff4757]/10 text-[#ff4757] border border-[#ff4757]/30 rounded-lg text-xs font-bold hover:bg-[#ff4757]/20 transition-all disabled:opacity-50"
+                  >
+                    {resolvingTrade?.id === trade.id && resolvingTrade?.outcome === "NO" ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />}
+                    NO
+                  </button>
                 </div>
               </div>
             ))}

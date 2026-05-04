@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMarketStore, useSignalStore } from "@/stores";
-import { getMarkets } from "@/lib/api";
-import {
+import { getMarkets, scanMarkets } from "@/lib/api";
+import { Loader2,
   Search,
   Grid3X3,
   List,
@@ -154,13 +154,30 @@ const MarketsExplorer = () => {
   const { activeSignals } = useSignalStore();
   const [page, setPage] = useState(1);
   const [showFilters, setShowFilters] = useState(false);
+  const [scanning, setScanning] = useState(false);
+
+  const handleScan = async () => {
+    setScanning(true);
+    try {
+      await scanMarkets({ max_results: 100 });
+      await fetchMarkets();
+    } catch { /* ignore */ }
+    setScanning(false);
+  };
 
   const fetchMarkets = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const res = await getMarkets({ status: "open", page_size: 100 });
-      const enriched = (res.results || []).map((m) => {
+      const seen = new Set<string>();
+      const enriched = (res.results || [])
+        .filter((m) => {
+          if (seen.has(m.bayse_event_id)) return false;
+          seen.add(m.bayse_event_id);
+          return true;
+        })
+        .map((m) => {
         const signal = activeSignals.find((s) => s.market_id === m.bayse_event_id || s.market_event_id === m.bayse_event_id);
         return {
           ...m,
@@ -212,6 +229,14 @@ const MarketsExplorer = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleScan}
+            disabled={scanning}
+            className="flex items-center gap-2 px-3 py-2 bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/30 rounded-lg text-sm font-medium hover:bg-[#00ff88]/20 transition-all disabled:opacity-50"
+          >
+            <Loader2 className={`w-4 h-4 ${scanning ? "animate-spin" : ""}`} />
+            {scanning ? "Scanning..." : "Scan Latest"}
+          </button>
           <button
             onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
             className="p-2 bg-[#131a2b] border border-[#1a2030] rounded-lg text-[#8b92a8] hover:text-[#dee2f5] transition-colors"

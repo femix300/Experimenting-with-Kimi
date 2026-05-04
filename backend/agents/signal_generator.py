@@ -166,6 +166,7 @@ def generate_signal(market_event_id: str, user_id: str = "anonymous", user_bankr
         },
     }
 
+    signal_doc["id"] = signal_doc_id
     fs.set(Collection.SIGNALS, signal_doc_id, signal_doc)
     logger.info(f"Signal generated: {market.get('title')} | {direction} | Edge: {float(edge):.1f}% | Kelly: {float(kelly_pct):.1f}%")
 

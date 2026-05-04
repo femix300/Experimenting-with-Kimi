@@ -14,6 +14,7 @@ import {
   X,
   Trash2,
   Tag,
+  Search,
 } from "lucide-react";
 import type { Signal } from "@/types";
 import { CATEGORY_COLORS, CATEGORY_LABELS } from "@/types";
@@ -142,6 +143,7 @@ const SignalFeed = () => {
   const [stats, setStats] = useState<{ total_active: number; by_direction: Record<string, number>; by_strength: Record<string, number>; edge_stats?: { avg_edge: number; max_edge: number; min_edge: number }; confidence_stats?: { avg_confidence: number; max_confidence: number; min_confidence: number } } | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "info" } | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [searchQuery, setSearchQuery] = useState("");
 
   const fetchSignals = useCallback(async () => {
     if (clearedRef.current) return;
@@ -324,6 +326,16 @@ const SignalFeed = () => {
           <Filter className="w-4 h-4" />
           <span className="text-sm">Filters</span>
         </div>
+        <div className="relative min-w-[200px] flex-1 max-w-xs">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8b92a8]" />
+          <input
+            type="text"
+            placeholder="Search signals..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 bg-[#0a0e17] border border-[#1a2030] rounded-lg text-sm text-[#dee2f5] placeholder:text-[#5a6070] focus:outline-none focus:border-[#00d4ff]/50"
+          />
+        </div>
         <div className="flex flex-wrap gap-2">
           {categories.map((cat) => (
             <button
@@ -389,6 +401,7 @@ const SignalFeed = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {activeSignals
+            .filter((s) => !searchQuery || s.market_title.toLowerCase().includes(searchQuery.toLowerCase()))
             .sort((a, b) => b.edge_score - a.edge_score)
             .map((signal) => (
               <SignalCard
