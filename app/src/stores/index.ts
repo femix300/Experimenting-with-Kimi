@@ -59,7 +59,7 @@ export const useMarketStore = create<MarketState>((set, get) => ({
   filters: {
     categories: [],
     status: "open",
-    sortBy: "volume",
+    sortBy: "edge",
     timeRange: "all",
     search: "",
     minLiquidity: false,
@@ -103,8 +103,8 @@ export const useMarketStore = create<MarketState>((set, get) => ({
     }
 
     switch (filters.sortBy) {
-      case "volume":
-        result.sort((a, b) => b.total_volume - a.total_volume);
+      case "liquidity":
+        result.sort((a, b) => b.liquidity - a.liquidity);
         break;
       case "edge":
         result.sort((a, b) => (b.edge_score || 0) - (a.edge_score || 0));

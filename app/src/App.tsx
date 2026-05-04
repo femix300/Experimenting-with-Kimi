@@ -1,3 +1,4 @@
+import MarketDeepDive from "./pages/MarketDeepDive";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Suspense, lazy, useEffect } from "react";
 import { useAuthStore } from "./stores";
@@ -11,7 +12,6 @@ const AuthPage = lazy(() => import("./pages/AuthPage"));
 const ProfilePage = lazy(() => import("./pages/ProfilePage"));
 const SignalFeed = lazy(() => import("./pages/SignalFeed"));
 const MarketsExplorer = lazy(() => import("./pages/MarketsExplorer"));
-const MarketDeepDive = lazy(() => import("./pages/MarketDeepDive"));
 const Backtester = lazy(() => import("./pages/Backtester"));
 const Portfolio = lazy(() => import("./pages/Portfolio"));
 const Calibration = lazy(() => import("./pages/Calibration"));
@@ -42,7 +42,7 @@ function App() {
     return () => unsubscribe();
   }, [setAuthenticated, setUser, setToken, setAuthLoading]);
 
-  if (authLoading) return <LoadingScreen message="Initializing EdgeIQ..." />;
+  if (authLoading && !window.location.pathname.startsWith("/market/")) return <LoadingScreen message="Initializing EdgeIQ..." />;
 
   return (
     <BrowserRouter>

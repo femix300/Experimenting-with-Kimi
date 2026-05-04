@@ -14,6 +14,7 @@ import { Loader2,
   TrendingUp,
   X,
   Droplets,
+  BrainCircuit,
 } from "lucide-react";
 import type { Market } from "@/types";
 
@@ -57,7 +58,7 @@ const getLiquidityLabel = (liq: number) => {
   return { label: "Thin", color: "text-[#ff4757]" };
 };
 
-const MarketCard = memo(({ market, onClick, hasEdge }: { market: Market; onClick: () => void; hasEdge?: boolean }) => {
+const MarketCard = memo(({ market, onClick, onDeepDive, hasEdge }: { market: Market; onClick: () => void; onDeepDive?: () => void; hasEdge?: boolean }) => {
   const cat = CATEGORY_CONFIG.find((c) => c.key === market.category) || CATEGORY_CONFIG[4];
   const liq = getLiquidityLabel(market.liquidity);
   const prob = market.implied_probability || (market.current_price || 0) * 100;
@@ -97,7 +98,7 @@ const MarketCard = memo(({ market, onClick, hasEdge }: { market: Market; onClick
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1">
             <Volume2 className="w-3 h-3" />
-            {formatVolume(market.total_volume || 0)}
+            {formatVolume(market.liquidity || 0)}
           </span>
           <span className={`flex items-center gap-1 ${liq.color}`}>
             <Droplets className="w-3 h-3" />
@@ -109,12 +110,18 @@ const MarketCard = memo(({ market, onClick, hasEdge }: { market: Market; onClick
           {formatTimeRemaining(market.time_remaining_hours, market.status)}
         </span>
       </div>
+      {onDeepDive && (
+        <button onClick={(e) => { e.stopPropagation(); onDeepDive(); }} className="mt-3 w-full flex items-center justify-center gap-2 py-2 bg-gradient-to-r from-[#00d4ff]/10 to-[#00ff88]/10 border border-[#00d4ff]/20 rounded-lg text-xs font-bold text-[#00d4ff] hover:from-[#00d4ff]/20 hover:to-[#00ff88]/20 transition-all">
+          <BrainCircuit className="w-3.5 h-3.5" />
+          Deep Dive
+        </button>
+      )}
     </div>
   );
 });
 MarketCard.displayName = "MarketCard";
 
-const MarketRow = memo(({ market, onClick, hasEdge }: { market: Market; onClick: () => void; hasEdge?: boolean }) => {
+const MarketRow = memo(({ market, onClick, onDeepDive, hasEdge }: { market: Market; onClick: () => void; onDeepDive?: () => void; hasEdge?: boolean }) => {
   const cat = CATEGORY_CONFIG.find((c) => c.key === market.category) || CATEGORY_CONFIG[4];
   const prob = market.implied_probability || (market.current_price || 0) * 100;
 
@@ -138,10 +145,18 @@ const MarketRow = memo(({ market, onClick, hasEdge }: { market: Market; onClick:
       </td>
       <td className="py-3 px-4 text-sm font-mono-num text-[#dee2f5]">{formatPrice(market.current_price || 0)}</td>
       <td className="py-3 px-4 text-sm font-mono-num text-[#00d4ff]">{formatProb(prob)}</td>
-      <td className="py-3 px-4 text-sm font-mono-num text-[#8b92a8]">{formatVolume(market.total_volume || 0)}</td>
+      <td className="py-3 px-4 text-sm font-mono-num text-[#8b92a8]">{formatVolume(market.liquidity || 0)}</td>
       <td className="py-3 px-4 text-sm font-mono-num text-[#8b92a8]">{formatTimeRemaining(market.time_remaining_hours, market.status)}</td>
       <td className="py-3 px-4">
-        <ChevronRight className="w-4 h-4 text-[#00d4ff]" />
+        <div className="flex items-center gap-2">
+          {onDeepDive && (
+            <button onClick={(e) => { e.stopPropagation(); onDeepDive(); }} className="flex items-center gap-1 px-2 py-1 bg-[#00d4ff]/10 border border-[#00d4ff]/20 rounded text-[10px] font-bold text-[#00d4ff] hover:bg-[#00d4ff]/20 transition-all">
+              <BrainCircuit className="w-3 h-3" />
+              Deep Dive
+            </button>
+          )}
+          <ChevronRight className="w-4 h-4 text-[#00d4ff]" />
+        </div>
       </td>
     </tr>
   );
@@ -207,7 +222,7 @@ const MarketsExplorer = () => {
   ].filter(Boolean).length;
 
   const clearFilters = () => {
-    setFilters({ categories: [], status: "open", search: "", minLiquidity: false, sortBy: "volume" });
+    setFilters({ categories: [], status: "open", search: "", minLiquidity: false, sortBy: "liquidity" });
   };
 
   const paginated = filteredMarkets.slice(0, page * 20);
@@ -334,7 +349,7 @@ const MarketsExplorer = () => {
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-xs text-[#8b92a8]">Sort by:</span>
               {[
-                { key: "volume", label: "Volume", icon: Volume2 },
+                { key: "liquidity", label: "Liquidity", icon: Volume2 },
                 { key: "edge", label: "Edge", icon: TrendingUp },
                 { key: "time_asc", label: "Closing Soon", icon: Clock },
                 { key: "change", label: "24h Change", icon: ArrowUpDown },
@@ -411,7 +426,8 @@ const MarketsExplorer = () => {
               key={market.id}
               market={market}
               hasEdge={signalMarketIds.has(market.bayse_event_id)}
-              onClick={() => navigate(`/market/${market.bayse_event_id}`)}
+              onClick={() => navigate(`/market/${market.bayse_event_id}`, { state: { staticOnly: true } })}
+              onDeepDive={() => navigate(`/market/${market.bayse_event_id}`)}
             />
           ))}
         </div>
@@ -434,7 +450,8 @@ const MarketsExplorer = () => {
                   key={market.id}
                   market={market}
                   hasEdge={signalMarketIds.has(market.bayse_event_id)}
-                  onClick={() => navigate(`/market/${market.bayse_event_id}`)}
+                  onClick={() => navigate(`/market/${market.bayse_event_id}`, { state: { staticOnly: true } })}
+              onDeepDive={() => navigate(`/market/${market.bayse_event_id}`)}
                 />
               ))}
             </tbody>
