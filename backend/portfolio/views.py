@@ -397,7 +397,7 @@ class PortfolioViewSet(ViewSet):
                 "bankroll": profile.get("bankroll", 0),
                 "total_trades": total,
                 "winning_trades": wins,
-                "losing_trades": total - wins,
+                "losing_trades": len([t for t in closed_trades if t.get("status") == "lost"]),
                 "win_rate": round(win_rate, 2),
                 "total_pnl": profile.get("total_pnl", 0),
                 "total_staked": round(total_staked, 2),

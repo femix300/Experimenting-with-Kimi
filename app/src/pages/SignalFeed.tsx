@@ -135,7 +135,7 @@ SignalCard.displayName = "SignalCard";
 
 const SignalFeed = () => {
   const navigate = useNavigate();
-  const { activeSignals, loading, error, minEdgeFilter, categoryFilter, setActiveSignals, setLoading, setError, setMinEdgeFilter, setCategoryFilter, clearAllSignals, cleared } = useSignalStore();
+  const { activeSignals, loading, error, minEdgeFilter, categoryFilter, setActiveSignals, setLoading, setError, setMinEdgeFilter, setCategoryFilter, clearAllSignals, cleared, setSelectedSignal } = useSignalStore();
   const clearedRef = useRef(cleared);
   useEffect(() => { clearedRef.current = cleared; }, [cleared]);
   const { setSelectedMarket, setQuantMetrics, setAiAnalysis } = useMarketStore();
@@ -213,6 +213,28 @@ const SignalFeed = () => {
       analyzed_at: signal.created_at,
     } as any);
     
+    setSelectedSignal(signal);
+    sessionStorage.setItem("cachedSignal", JSON.stringify(signal));
+    sessionStorage.setItem("cachedMarket", JSON.stringify({ title: signal.market_title, bayse_event_id: marketId, current_price: signal.market_probability / 100, implied_probability: signal.market_probability, category: signal.category || "other" }));
+    sessionStorage.setItem("cachedAiAnalysis", JSON.stringify({
+      market_id: marketId,
+      market_title: signal.market_title,
+      probability: signal.ai_probability,
+      confidence: signal.confidence,
+      reasoning: signal.reasoning || "",
+      sources: "",
+      model_used: signal.model_used || "gemini-1.5-flash",
+      search_grounding_used: true,
+      analyzed_at: signal.created_at,
+    }));
+    sessionStorage.setItem("cachedQuantMetrics", JSON.stringify({
+      momentum_score: signal.quant_snapshot?.momentum_score || 0,
+      momentum_direction: signal.quant_snapshot?.momentum_direction || "neutral",
+      volume_acceleration: signal.quant_snapshot?.volume_acceleration || 1,
+      order_book_bias: signal.quant_snapshot?.order_book_bias || "neutral",
+      bid_ask_spread: 0,
+    }));
+    sessionStorage.setItem("cachedMarketId", marketId);
     sessionStorage.setItem("fromSignal", "true");
     navigate(`/market/${marketId}`);
   };

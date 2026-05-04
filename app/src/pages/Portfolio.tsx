@@ -55,7 +55,7 @@ const Portfolio = () => {
 
   const winLossData = [
     { name: "Wins", value: analytics?.winning_trades || 0 },
-    { name: "Losses", value: Math.max(0, (analytics?.total_trades || 0) - (analytics?.winning_trades || 0)) },
+    { name: "Losses", value: (analytics?.losing_trades || 0) },
   ];
 
   const qpiScore = qpi?.score ?? Math.min(100, Math.round(

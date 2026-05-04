@@ -1,6 +1,31 @@
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { logoutFirebase } from "@/lib/firebase";
-import { useState } from "react";
+import { useState, Component, type ReactNode } from "react";
+
+class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(error: Error, info: any) { console.error("[ErrorBoundary]", error, info); }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full py-20 gap-4">
+          <p className="text-[#ff4757] text-sm">Something went wrong loading this page.</p>
+          <button
+            onClick={() => { this.setState({ hasError: false }); window.location.href = "/markets"; }}
+            className="px-4 py-2 bg-[#00d4ff] text-[#0a0e17] rounded-lg text-sm font-bold"
+          >
+            Go to Markets
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 import { useAuthStore } from "@/stores";
 import {
   Radar,
@@ -164,7 +189,7 @@ const DashboardLayout = () => {
 
       <main className="flex-1 md:ml-64 pt-14 md:pt-0 min-h-screen">
         <div className="p-4 md:p-8 max-w-[1440px] mx-auto">
-          <Outlet />
+          <ErrorBoundary key={location.pathname}><Outlet /></ErrorBoundary>
         </div>
       </main>
     </div>

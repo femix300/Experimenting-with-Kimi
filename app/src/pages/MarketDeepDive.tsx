@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, memo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useMarketStore } from "@/stores";
+import { useMarketStore, useSignalStore } from "@/stores";
 import { analyzeMarketStream, getPriceHistory, getOrderBook, simulateTrade } from "@/lib/api";
 //import { analyzeMarket, getPriceHistory, getOrderBook, simulateTrade } from "@/lib/api";
 import {
@@ -73,6 +73,7 @@ const MarketDeepDive = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { selectedMarket, quantMetrics: storeQuantMetrics, aiAnalysis: storeAiAnalysis, setSelectedMarket, setQuantMetrics, setAiAnalysis } = useMarketStore();
+  const { selectedSignal } = useSignalStore();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [signal, setSignal] = useState<Signal | null>(null);
@@ -112,7 +113,16 @@ const MarketDeepDive = () => {
     setPipelineProgress(null);
 
     const run = async () => {
-      const isFromSignal = sessionStorage.getItem("fromSignal") === "true";
+      const isFromSignal = sessionStorage.getItem("fromSignal") === "true" || (!!sessionStorage.getItem("cachedSignal") && sessionStorage.getItem("cachedMarketId") === id);
+      sessionStorage.setItem("cachedMarketId", id || "");
+      // If not from signal feed, clear all cached signal data so markets page always runs fresh analysis
+      if (!isFromSignal) {
+        sessionStorage.removeItem("cachedSignal");
+        sessionStorage.removeItem("cachedMarket");
+        sessionStorage.removeItem("cachedAiAnalysis");
+        sessionStorage.removeItem("cachedQuantMetrics");
+        sessionStorage.removeItem("fromSignal");
+      }
       setFromSignal(isFromSignal);
 
       // If data already cached from Signal Feed, skip heavy analysis, just fetch charts
@@ -134,12 +144,21 @@ const MarketDeepDive = () => {
             })));
           }
           if (ob) setOrderBookData(ob);
-          if (storeAiAnalysis) {
-            setLocalAiAnalysis(storeAiAnalysis);
+          const cachedSignal = sessionStorage.getItem("cachedSignal");
+          const signalToUse = selectedSignal || (cachedSignal ? JSON.parse(cachedSignal) : null);
+          if (signalToUse) { setSignal(signalToUse); }
+          const cachedMarket = sessionStorage.getItem("cachedMarket");
+          if (storeAiAnalysis) { setLocalAiAnalysis(storeAiAnalysis); }
+          else {
+            const cachedAi = sessionStorage.getItem("cachedAiAnalysis");
+            if (cachedAi) setLocalAiAnalysis(JSON.parse(cachedAi));
           }
-          if (storeQuantMetrics) {
-            setLocalQuantMetrics(storeQuantMetrics);
+          if (storeQuantMetrics) { setLocalQuantMetrics(storeQuantMetrics); }
+          else {
+            const cachedQuant = sessionStorage.getItem("cachedQuantMetrics");
+            if (cachedQuant) setLocalQuantMetrics(JSON.parse(cachedQuant));
           }
+          if (!selectedMarket && cachedMarket) { setSelectedMarket(JSON.parse(cachedMarket)); }
         } catch { /* ignore */ }
         setLoading(false);
         sessionStorage.removeItem("fromSignal");
@@ -228,7 +247,7 @@ const MarketDeepDive = () => {
     const stake = kellyMap[riskMode];
     if (!stake || !signal) return;
     try {
-      await simulateTrade(signal.market_event_id, stake);
+      await simulateTrade(signal.id || signal.market_event_id, stake);
       const stakeFormatted = stake.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       setToast({
         message: `Trade simulated! ₦${stakeFormatted} staked on "${signal.market_title?.slice(0, 40)}..."`,
